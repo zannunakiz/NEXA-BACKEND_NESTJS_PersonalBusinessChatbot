@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NextFunction, Request, Response } from 'express';
 import 'dotenv/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import cluster from 'node:cluster';
@@ -34,6 +35,33 @@ async function bootstrap() {
 
     app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
     app.useGlobalFilters(new AllExceptionsFilter());
+
+    const httpLogger = new Logger('HTTP');
+
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const { method, originalUrl } = req;
+      const startTime = Date.now();
+
+      res.on('finish', () => {
+        const { statusCode } = res;
+        const duration = Date.now() - startTime;
+        const errorMessage = res.locals.errorMessage
+          ? ` | Error: ${res.locals.errorMessage}`
+          : '';
+
+        const logMessage = `${method} ${originalUrl} ${statusCode} - ${duration}ms${errorMessage}`;
+
+        if (statusCode >= 500) {
+          httpLogger.error(logMessage);
+        } else if (statusCode >= 400) {
+          httpLogger.warn(logMessage);
+        } else {
+          httpLogger.log(logMessage);
+        }
+      });
+
+      next();
+    });
 
     const port = process.env.PORT || 3000;
     await app.listen(port);

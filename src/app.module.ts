@@ -13,6 +13,7 @@ import { RedisModule } from './redis/redis.module';
 
 import { AuthModule } from './auth/auth.module';
 import { MasterModule } from './master/master.module';
+import { EmailjsModule } from './emailjs/emailjs.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { MasterModule } from './master/master.module';
     CloudinaryModule,
     AuthModule,
     MasterModule,
+    EmailjsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

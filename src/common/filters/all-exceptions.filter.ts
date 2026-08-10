@@ -4,15 +4,12 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
-
-  catch(exception: unknown, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
@@ -22,24 +19,43 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    const exceptionResponse =
       exception instanceof HttpException
         ? exception.getResponse()
-        : (exception as Error).message || 'Internal Server Error';
+        : 'Internal server error';
 
-    const stackTrace = (exception as Error).stack || '';
+    let errorOutput: unknown;
+    let logMessage: string;
 
-    // Perintah ini yang menulis log ke file logs/error.log
-    this.logger.error(
-      `[${request.method}] ${request.url} - Status: ${status} - Error: ${JSON.stringify(message)}`,
-      stackTrace,
-    );
+    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+      if ('message' in exceptionResponse) {
+        const msgProp = exceptionResponse.message;
+        if (Array.isArray(msgProp)) {
+          errorOutput = msgProp.join(', ');
+          logMessage = msgProp.join(', ');
+        } else if (typeof msgProp === 'string') {
+          errorOutput = msgProp;
+          logMessage = msgProp;
+        } else {
+          errorOutput = msgProp;
+          logMessage = JSON.stringify(msgProp);
+        }
+      } else {
+        errorOutput = exceptionResponse;
+        logMessage = JSON.stringify(exceptionResponse);
+      }
+    } else {
+      errorOutput = exceptionResponse;
+      logMessage = String(exceptionResponse);
+    }
+
+    response.locals.errorMessage = logMessage;
 
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message,
+      error: errorOutput,
     });
   }
 }

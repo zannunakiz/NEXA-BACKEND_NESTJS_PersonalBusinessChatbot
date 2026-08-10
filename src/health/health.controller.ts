@@ -8,6 +8,7 @@ import {
 import { v2 as cloudinary } from 'cloudinary';
 import cluster from 'node:cluster';
 import { DatabaseService } from '../database/database.service';
+import { EmailjsService } from '../emailjs/emailjs.service';
 import { RedisService } from '../redis/redis.service';
 
 interface CloudinaryPingResponse {
@@ -17,10 +18,11 @@ interface CloudinaryPingResponse {
 @Controller('health')
 export class HealthController {
   constructor(
-    private health: HealthCheckService,
-    private memory: MemoryHealthIndicator,
-    private databaseService: DatabaseService,
-    private redisService: RedisService,
+    private readonly health: HealthCheckService,
+    private readonly memory: MemoryHealthIndicator,
+    private readonly databaseService: DatabaseService,
+    private readonly redisService: RedisService,
+    private readonly emailjsService: EmailjsService,
   ) {}
 
   @Get()
@@ -93,6 +95,19 @@ export class HealthController {
             },
           };
         }
+      },
+
+      async () => {
+        const emailjsCheck = await this.emailjsService.ping();
+        if (emailjsCheck.status === 'up') {
+          return { emailjs: { status: 'up' } };
+        }
+        return {
+          emailjs: {
+            status: 'down',
+            message: emailjsCheck.message || 'EmailJS service unreachable',
+          },
+        };
       },
 
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
