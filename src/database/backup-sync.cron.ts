@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import cluster from 'node:cluster';
 import { DatabaseService } from './database.service';
 
 @Injectable()
@@ -8,8 +9,12 @@ export class BackupSyncCron {
 
   constructor(private readonly databaseService: DatabaseService) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleBackupSync(): Promise<void> {
+    if (cluster.isWorker && cluster.worker?.id !== 1) {
+      return;
+    }
+
     const mainUrl = process.env.NEONDB_MAIN_URL;
     const backupUrl = process.env.NEONDB_BACKUP_URL;
 

@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { NextFunction, Request, Response } from 'express';
 import 'dotenv/config';
+import { NextFunction, Request, Response } from 'express';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import cluster from 'node:cluster';
 
@@ -16,7 +16,7 @@ async function bootstrap() {
     const logger = new Logger('ClusterMaster');
 
     logger.log(`🚀 Master Process running on PID: ${process.pid}`);
-    logger.log(`Forking ${WORKER_COUNT} Workers...`);
+    logger.log(`Forking ${WORKER_COUNT} Worker...`);
     console.log('Server is running on http://localhost:3000');
     console.log('Health at http://localhost:3000/health');
 

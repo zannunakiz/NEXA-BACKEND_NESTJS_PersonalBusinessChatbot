@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   HealthCheck,
   HealthCheckResult,
@@ -23,6 +24,7 @@ export class HealthController {
     private readonly databaseService: DatabaseService,
     private readonly redisService: RedisService,
     private readonly emailjsService: EmailjsService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Get()
@@ -108,6 +110,24 @@ export class HealthController {
             message: emailjsCheck.message || 'EmailJS service unreachable',
           },
         };
+      },
+
+      () => {
+        const key = this.configService.get<string>('ARCJET_KEY');
+        if (!key) {
+          return Promise.resolve({
+            arcjet: {
+              status: 'down',
+              message: 'ARCJET_KEY missing in environment configuration',
+            },
+          });
+        }
+        return Promise.resolve({
+          arcjet: {
+            status: 'up',
+            mode: this.configService.get<string>('ARCJET_MODE', 'DRY_RUN'),
+          },
+        });
       },
 
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
