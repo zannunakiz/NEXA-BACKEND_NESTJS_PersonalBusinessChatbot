@@ -21,6 +21,7 @@ import { EmailjsModule } from './emailjs/emailjs.module';
 import { HealthModule } from './health/health.module';
 import { MasterModule } from './master/master.module';
 import { RedisModule } from './redis/redis.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { RedisModule } from './redis/redis.module';
     MasterModule,
     EmailjsModule,
     CustomArcjetModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [

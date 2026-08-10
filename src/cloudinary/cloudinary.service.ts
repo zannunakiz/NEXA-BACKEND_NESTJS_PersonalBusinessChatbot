@@ -1,28 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import 'multer';
 import streamifier from 'streamifier';
-
-type CloudinaryUploadResult = {
-  secure_url: string;
-  public_id: string;
-};
-
-type CloudinaryDestroyResult = {
-  result?: string;
-};
-
-export interface ExpressMulterFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  size: number;
-  buffer: Buffer;
-}
 
 @Injectable()
 export class CloudinaryService {
+  private readonly logger = new Logger(CloudinaryService.name);
+
   constructor(private readonly configService: ConfigService) {
     cloudinary.config({
       cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
@@ -31,78 +16,75 @@ export class CloudinaryService {
     });
   }
 
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return String(error);
-  }
-
-  async uploadImage(file: ExpressMulterFile): Promise<CloudinaryUploadResult> {
+  async uploadImage(
+    file: Express.Multer.File,
+    folder = 'NEXA_nestjs',
+  ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'instagus_posts' },
-        (error, result: CloudinaryUploadResult | undefined) => {
+        { folder },
+        (error, result) => {
           if (error) {
-            return reject(
-              new BadRequestException(
-                `Cloudinary upload failed: ${this.getErrorMessage(error)}`,
-              ),
-            );
+            let rejectionError: Error;
+            if (error instanceof Error) {
+              rejectionError = error;
+            } else if (typeof error === 'string') {
+              rejectionError = new Error(error);
+            } else {
+              rejectionError = new Error(JSON.stringify(error));
+            }
+            return reject(rejectionError);
           }
           if (!result) {
-            return reject(
-              new BadRequestException(
-                'Cloudinary upload returned empty response',
-              ),
-            );
+            return reject(new Error('Cloudinary upload result is undefined'));
           }
           resolve(result);
         },
       );
-
       streamifier.createReadStream(file.buffer).pipe(uploadStream);
     });
   }
 
-  async deleteImage(publicId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      void cloudinary.uploader.destroy(
-        publicId,
-        (error, result: CloudinaryDestroyResult | undefined) => {
-          if (error) {
-            return reject(
-              new BadRequestException(
-                `Cloudinary deletion failed: ${this.getErrorMessage(error)}`,
-              ),
-            );
-          }
+  async deleteImage(imageUrlOrPublicId: string): Promise<void> {
+    const publicId =
+      this.extractPublicId(imageUrlOrPublicId) ?? imageUrlOrPublicId;
 
-          const status = result?.result;
-          if (status !== 'ok' && status !== 'not found') {
-            return reject(
-              new BadRequestException(
-                `Failed to delete image from Cloudinary: ${status ?? 'unknown'}`,
-              ),
-            );
-          }
-          resolve();
-        },
+    if (!publicId) {
+      return;
+    }
+
+    try {
+      await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete image from Cloudinary (Public ID: ${publicId}):`,
+        error instanceof Error ? error.message : String(error),
       );
-    });
+    }
   }
 
-  extractPublicIdFromUrl(url: string): string {
-    const regex = /\/v\d+\/(.+)\.[a-zA-Z0-9]+$/;
-    const match = url.match(regex);
-    if (match && match[1]) {
-      return match[1];
+  public extractPublicId(url: string): string | null {
+    try {
+      if (!url || !url.includes('cloudinary.com')) {
+        return null;
+      }
+
+      const parts = url.split('/upload/');
+      if (parts.length < 2) {
+        return null;
+      }
+
+      let path = parts[1];
+      path = path.replace(/^v\d+\//, '');
+
+      const lastDotIndex = path.lastIndexOf('.');
+      if (lastDotIndex !== -1) {
+        path = path.substring(0, lastDotIndex);
+      }
+
+      return path;
+    } catch {
+      return null;
     }
-    const fallbackRegex = /\/([^/]+)\.[a-zA-Z0-9]+$/;
-    const fallbackMatch = url.match(fallbackRegex);
-    if (fallbackMatch && fallbackMatch[1]) {
-      return fallbackMatch[1];
-    }
-    throw new BadRequestException('Invalid Cloudinary URL structure');
   }
 }

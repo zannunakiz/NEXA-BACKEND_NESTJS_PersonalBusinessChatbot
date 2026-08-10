@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import 'dotenv/config';
 import { NextFunction, Request, Response } from 'express';
@@ -8,6 +8,7 @@ import cluster from 'node:cluster';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 cluster.schedulingPolicy = cluster.SCHED_RR;
 const WORKER_COUNT = 5;
@@ -35,17 +36,28 @@ async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
     app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+    // Global Validation Pipe
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: false,
+        transform: true,
+      }),
+    );
+
+    // Global Response Interceptor & Exception Filter
+    app.useGlobalInterceptors(new TransformInterceptor());
     app.useGlobalFilters(new AllExceptionsFilter());
 
     const httpLogger = new Logger('HTTP');
-    const clsService = app.get(ClsService); // Ambil ClsService dari NestJS Container
+    const clsService = app.get(ClsService);
 
     app.use((req: Request, res: Response, next: NextFunction) => {
       const { method, originalUrl } = req;
       const startTime = Date.now();
 
       res.on('finish', () => {
-        // Ambil ID langsung dari instance ClsService yang di-inject
         const requestId = clsService.getId() || 'N/A';
 
         const { statusCode } = res;

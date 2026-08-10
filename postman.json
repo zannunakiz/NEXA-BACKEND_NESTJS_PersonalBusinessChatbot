@@ -25,6 +25,124 @@
       "key": "masterKey",
       "value": "master-key",
       "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "console.log('📌 Pre-request - Current tokens:', {",
+          "    accessToken: pm.collectionVariables.get('accessToken') ? '✓ exists' : '✗ empty',",
+          "    refreshToken: pm.collectionVariables.get('refreshToken') ? '✓ exists' : '✗ empty'",
+          "});"
+        ],
+        "type": "text/javascript"
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "console.log('📌 Response Status:', pm.response.code);",
+          "console.log('📌 Response Body:', pm.response.text());",
+          "",
+          "if (pm.response.code === 200 || pm.response.code === 201) {",
+          "    try {",
+          "        var jsonData = pm.response.json();",
+          "        console.log('📌 Parsed Response:', JSON.stringify(jsonData, null, 2));",
+          "        ",
+          "        // Extract from data object (new structure)",
+          "        var responseData = jsonData.data || jsonData;",
+          "        ",
+          "        // FORCE UPDATE accessToken",
+          "        if (responseData.accessToken) {",
+          "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
+          "            console.log('✅ ACCESS TOKEN SET:', responseData.accessToken.substring(0, 20) + '...');",
+          "        } else if (jsonData.accessToken) {",
+          "            pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+          "            console.log('✅ ACCESS TOKEN SET (root):', jsonData.accessToken.substring(0, 20) + '...');",
+          "        } else {",
+          "            console.log('❌ No accessToken found in response');",
+          "        }",
+          "        ",
+          "        // FORCE UPDATE refreshToken",
+          "        if (responseData.refreshToken) {",
+          "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
+          "            console.log('✅ REFRESH TOKEN SET:', responseData.refreshToken.substring(0, 20) + '...');",
+          "        } else if (jsonData.refreshToken) {",
+          "            pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+          "            console.log('✅ REFRESH TOKEN SET (root):', jsonData.refreshToken.substring(0, 20) + '...');",
+          "        } else {",
+          "            console.log('❌ No refreshToken found in response');",
+          "        }",
+          "        ",
+          "        // FORCE UPDATE user data - check both data.user and root user",
+          "        var userData = null;",
+          "        if (responseData.user) {",
+          "            userData = responseData.user;",
+          "            console.log('📌 User data found in data.user');",
+          "        } else if (jsonData.user) {",
+          "            userData = jsonData.user;",
+          "            console.log('📌 User data found in root.user');",
+          "        } else if (responseData.id || responseData.email) {",
+          "            userData = responseData;",
+          "            console.log('📌 User data found in data root');",
+          "        }",
+          "        ",
+          "        if (userData) {",
+          "            if (userData.id) {",
+          "                pm.collectionVariables.set('userId', userData.id);",
+          "                console.log('✅ User ID set:', userData.id);",
+          "            }",
+          "            if (userData.email) {",
+          "                pm.collectionVariables.set('userEmail', userData.email);",
+          "                console.log('✅ User Email set:', userData.email);",
+          "            }",
+          "            if (userData.username) {",
+          "                pm.collectionVariables.set('username', userData.username);",
+          "                console.log('✅ Username set:', userData.username);",
+          "            }",
+          "            if (userData.image_url) {",
+          "                console.log('📌 User image:', userData.image_url);",
+          "            }",
+          "        }",
+          "        ",
+          "        // VERIFY variables were set",
+          "        var finalAccess = pm.collectionVariables.get('accessToken');",
+          "        var finalRefresh = pm.collectionVariables.get('refreshToken');",
+          "        console.log('📌 FINAL VARIABLE STATE:', {",
+          "            accessToken: finalAccess ? '✓ (' + finalAccess.substring(0, 15) + '...)' : '✗ EMPTY',",
+          "            refreshToken: finalRefresh ? '✓ (' + finalRefresh.substring(0, 15) + '...)' : '✗ EMPTY',",
+          "            userId: pm.collectionVariables.get('userId') || '✗ EMPTY',",
+          "            userEmail: pm.collectionVariables.get('userEmail') || '✗ EMPTY',",
+          "            username: pm.collectionVariables.get('username') || '✗ EMPTY'",
+          "        });",
+          "        ",
+          "    } catch(e) {",
+          "        console.log('❌ Error processing response:', e.message);",
+          "    }",
+          "} else {",
+          "    console.log('❌ Response code not 200/201, skipping variable update');",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
     }
   ],
   "item": [
@@ -40,8 +158,7 @@
               "raw": "{{baseUrl}}/health",
               "host": ["{{baseUrl}}"],
               "path": ["health"]
-            },
-            "description": "Pings primary database nodes (main, duplicate, backup), Redis, Cloudinary, and checks memory heap/RSS."
+            }
           },
           "response": []
         }
@@ -57,13 +174,26 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var jsonData = pm.response.json();",
-                  "    if (jsonData.accessToken) {",
-                  "        pm.collectionVariables.set('accessToken', jsonData.accessToken);",
-                  "    }",
-                  "    if (jsonData.refreshToken) {",
-                  "        pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        ",
+                  "        if (responseData.accessToken) {",
+                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
+                  "        }",
+                  "        if (responseData.refreshToken) {",
+                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
+                  "        }",
+                  "        ",
+                  "        var userData = responseData.user || responseData;",
+                  "        if (userData.id) pm.collectionVariables.set('userId', userData.id);",
+                  "        if (userData.email) pm.collectionVariables.set('userEmail', userData.email);",
+                  "        if (userData.username) pm.collectionVariables.set('username', userData.username);",
+                  "        ",
+                  "        console.log('✅ REGISTER SUCCESS - Variables updated');",
+                  "    } catch(e) {",
+                  "        console.log('Error:', e.message);",
                   "    }",
                   "}"
                 ],
@@ -81,14 +211,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@nuxa.ai\",\n  \"username\": \"nuxauser\",\n  \"password\": \"SecurePass123!\",\n  \"imageUrl\": \"https://res.cloudinary.com/demo/image/upload/sample.jpg\"\n}"
+              "raw": "{\n  \"email\": \"user@nuxa.ai\",\n  \"username\": \"nuxauser\",\n  \"password\": \"SecurePass123!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "register"]
-            },
-            "description": "Registers a new user and automatically updates collection tokens."
+            }
           },
           "response": []
         },
@@ -99,14 +228,76 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var jsonData = pm.response.json();",
-                  "    if (jsonData.accessToken) {",
-                  "        pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "console.log('🔐 LOGIN ATTEMPT');",
+                  "",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        console.log('Login response:', JSON.stringify(jsonData, null, 2));",
+                  "        ",
+                  "        // Extract from data object",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        ",
+                  "        // FORCE SET accessToken from data",
+                  "        if (responseData.accessToken) {",
+                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
+                  "            console.log('✅ AccessToken SET from data');",
+                  "        } else if (jsonData.accessToken) {",
+                  "            pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "            console.log('✅ AccessToken SET from root');",
+                  "        } else {",
+                  "            console.log('❌ No accessToken in response!');",
+                  "            console.log('Response keys:', Object.keys(jsonData));",
+                  "            if (jsonData.data) console.log('Data keys:', Object.keys(jsonData.data));",
+                  "        }",
+                  "        ",
+                  "        // FORCE SET refreshToken from data",
+                  "        if (responseData.refreshToken) {",
+                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
+                  "            console.log('✅ RefreshToken SET from data');",
+                  "        } else if (jsonData.refreshToken) {",
+                  "            pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "            console.log('✅ RefreshToken SET from root');",
+                  "        } else {",
+                  "            console.log('❌ No refreshToken in response!');",
+                  "        }",
+                  "        ",
+                  "        // Extract user data - check multiple locations",
+                  "        var userData = null;",
+                  "        if (responseData.user) {",
+                  "            userData = responseData.user;",
+                  "        } else if (jsonData.user) {",
+                  "            userData = jsonData.user;",
+                  "        } else if (responseData.id) {",
+                  "            userData = responseData;",
+                  "        }",
+                  "        ",
+                  "        if (userData) {",
+                  "            if (userData.id) {",
+                  "                pm.collectionVariables.set('userId', userData.id);",
+                  "                console.log('✅ User ID:', userData.id);",
+                  "            }",
+                  "            if (userData.email) {",
+                  "                pm.collectionVariables.set('userEmail', userData.email);",
+                  "                console.log('✅ Email:', userData.email);",
+                  "            }",
+                  "            if (userData.username) {",
+                  "                pm.collectionVariables.set('username', userData.username);",
+                  "                console.log('✅ Username:', userData.username);",
+                  "            }",
+                  "        }",
+                  "        ",
+                  "        // VERIFY - Check if variables actually set",
+                  "        var verifyAccess = pm.collectionVariables.get('accessToken');",
+                  "        var verifyRefresh = pm.collectionVariables.get('refreshToken');",
+                  "        console.log('🔍 VERIFICATION - AccessToken:', verifyAccess ? '✓ EXISTS' : '✗ EMPTY');",
+                  "        console.log('🔍 VERIFICATION - RefreshToken:', verifyRefresh ? '✓ EXISTS' : '✗ EMPTY');",
+                  "        ",
+                  "    } catch(e) {",
+                  "        console.log('❌ Parse error:', e.message);",
                   "    }",
-                  "    if (jsonData.refreshToken) {",
-                  "        pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
-                  "    }",
+                  "} else {",
+                  "    console.log('❌ Login failed with status:', pm.response.code);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -129,8 +320,7 @@
               "raw": "{{baseUrl}}/auth/login",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "login"]
-            },
-            "description": "Logs in user via email or username and automatically updates collection tokens."
+            }
           },
           "response": []
         },
@@ -141,13 +331,21 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var jsonData = pm.response.json();",
-                  "    if (jsonData.accessToken) {",
-                  "        pm.collectionVariables.set('accessToken', jsonData.accessToken);",
-                  "    }",
-                  "    if (jsonData.refreshToken) {",
-                  "        pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        ",
+                  "        if (responseData.accessToken) {",
+                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
+                  "            console.log('✅ New AccessToken generated');",
+                  "        }",
+                  "        if (responseData.refreshToken) {",
+                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
+                  "            console.log('✅ New RefreshToken generated');",
+                  "        }",
+                  "    } catch(e) {",
+                  "        console.log('Error:', e.message);",
                   "    }",
                   "}"
                 ],
@@ -171,13 +369,36 @@
               "raw": "{{baseUrl}}/auth/refresh",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "refresh"]
-            },
-            "description": "Generates a new pair of access and refresh tokens."
+            }
           },
           "response": []
         },
         {
           "name": "Get User Profile (Me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        var userData = responseData.user || responseData;",
+                  "        ",
+                  "        if (userData.id) pm.collectionVariables.set('userId', userData.id);",
+                  "        if (userData.email) pm.collectionVariables.set('userEmail', userData.email);",
+                  "        if (userData.username) pm.collectionVariables.set('username', userData.username);",
+                  "        console.log('✅ Profile synced');",
+                  "    } catch(e) {",
+                  "        console.log('Error:', e.message);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "bearer",
@@ -195,8 +416,7 @@
               "raw": "{{baseUrl}}/auth/me",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "me"]
-            },
-            "description": "Retrieves profile details for the authenticated user."
+            }
           },
           "response": []
         },
@@ -219,8 +439,74 @@
               "raw": "{{baseUrl}}/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "USER",
+      "item": [
+        {
+          "name": "Edit User Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        var userData = responseData.user || responseData;",
+                  "        ",
+                  "        if (userData.username) {",
+                  "            pm.collectionVariables.set('username', userData.username);",
+                  "            console.log('✅ Username updated to:', userData.username);",
+                  "        }",
+                  "    } catch(e) {",
+                  "        console.log('Error:', e.message);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             },
-            "description": "Blacklists the current access token and clears the refresh token from Redis."
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "username",
+                  "value": "",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": ["{{baseUrl}}"],
+              "path": ["user"]
+            }
           },
           "response": []
         }
@@ -231,6 +517,33 @@
       "item": [
         {
           "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        var responseData = jsonData.data || jsonData;",
+                  "        ",
+                  "        if (responseData.masterKey) {",
+                  "            pm.collectionVariables.set('masterKey', responseData.masterKey);",
+                  "            console.log('✅ MasterKey updated');",
+                  "        }",
+                  "        if (responseData.users && Array.isArray(responseData.users)) {",
+                  "            pm.collectionVariables.set('userCount', responseData.users.length);",
+                  "            console.log(`✅ ${responseData.users.length} users found`);",
+                  "        }",
+                  "    } catch(e) {",
+                  "        console.log('Error:', e.message);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -247,13 +560,31 @@
               "raw": "{{baseUrl}}/master/getallusers",
               "host": ["{{baseUrl}}"],
               "path": ["master", "getallusers"]
-            },
-            "description": "Fetches all registered users from the database."
+            }
           },
           "response": []
         },
         {
           "name": "Clear Database (DANGER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('userId', '');",
+                  "    pm.collectionVariables.set('userEmail', '');",
+                  "    pm.collectionVariables.set('username', '');",
+                  "    pm.collectionVariables.set('accessToken', '');",
+                  "    pm.collectionVariables.set('refreshToken', '');",
+                  "    pm.collectionVariables.set('userCount', '0');",
+                  "    console.log('⚠️ Database cleared - All variables reset');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -270,8 +601,7 @@
               "raw": "{{baseUrl}}/master/cleardb",
               "host": ["{{baseUrl}}"],
               "path": ["master", "cleardb"]
-            },
-            "description": "Wipes all records across main, duplicate, and backup databases and purges media from Cloudinary."
+            }
           },
           "response": []
         }

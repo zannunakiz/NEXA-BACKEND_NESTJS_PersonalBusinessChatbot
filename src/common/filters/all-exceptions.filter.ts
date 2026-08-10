@@ -4,63 +4,78 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ClsServiceManager } from 'nestjs-cls';
+import {
+  ApiErrorResponse,
+  ValidationErrorDetail,
+} from '../interfaces/api-response.interface';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const cls = ClsServiceManager.getClsService();
-    const requestId = cls?.get<string>('requestId') ?? undefined;
+    const requestId =
+      (request.headers['x-request-id'] as string) ||
+      `req_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
+    let errorCode = 'INTERNAL_SERVER_ERROR';
+    let errors: ValidationErrorDetail[] | undefined = undefined;
 
-    const exceptionResponse =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : 'Internal server error';
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const resObj = exception.getResponse();
 
-    let errorOutput: unknown;
-    let logMessage: string;
+      if (typeof resObj === 'string') {
+        message = resObj;
+      } else if (typeof resObj === 'object' && resObj !== null) {
+        const payload = resObj as Record<string, unknown>;
+        message = (payload.message as string) || exception.message;
+        errorCode =
+          (payload.error as string)?.toUpperCase().replace(/\s+/g, '_') ||
+          'BAD_REQUEST';
 
-    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-      if ('message' in exceptionResponse) {
-        const msgProp = exceptionResponse.message;
-        if (Array.isArray(msgProp)) {
-          errorOutput = msgProp.join(', ');
-          logMessage = msgProp.join(', ');
-        } else if (typeof msgProp === 'string') {
-          errorOutput = msgProp;
-          logMessage = msgProp;
-        } else {
-          errorOutput = msgProp;
-          logMessage = JSON.stringify(msgProp);
+        if (Array.isArray(payload.message)) {
+          errorCode = 'VALIDATION_ERROR';
+          message = 'Validation failed';
+          errors = payload.message.map((msg: string) => {
+            const parts = msg.split(' ');
+            return {
+              field: parts[0] || 'unknown',
+              message: msg,
+            };
+          });
         }
-      } else {
-        errorOutput = exceptionResponse;
-        logMessage = JSON.stringify(exceptionResponse);
       }
-    } else {
-      errorOutput = exceptionResponse;
-      logMessage = String(exceptionResponse);
+    } else if (exception instanceof Error) {
+      message = exception.message;
+      this.logger.error(
+        `Unhandled exception: ${exception.message}`,
+        exception.stack,
+      );
     }
 
-    response.locals.errorMessage = logMessage;
-
-    response.status(status).json({
+    const errorResponse: ApiErrorResponse = {
+      success: false,
       statusCode: status,
-      requestId,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      error: errorOutput,
-    });
+      errorCode,
+      message,
+      ...(errors ? { errors } : {}),
+      meta: {
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        requestId,
+      },
+    };
+
+    response.status(status).json(errorResponse);
   }
 }

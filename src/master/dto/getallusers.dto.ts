@@ -1,3 +1,5 @@
+import { IsNotEmpty, IsString } from 'class-validator';
+
 export interface UserDto {
   id: string;
   email: string;
@@ -8,6 +10,8 @@ export interface UserDto {
 }
 
 export class GetAllUsersRequest {
+  @IsString()
+  @IsNotEmpty({ message: 'masterKey cannot be empty' })
   masterKey!: string;
 }
 

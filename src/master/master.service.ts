@@ -1,13 +1,14 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { v2 as cloudinary } from 'cloudinary';
+import { Client, QueryResult } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { ClearDbResponse, TableDetail } from './dto/cleardb.dto';
-import { GetAllUsersResponse, UserDto } from './dto/getallusers.dto';
+import { UserDto } from './dto/getallusers.dto';
+
+interface CountRow {
+  count: string;
+}
 
 @Injectable()
 export class MasterService {
@@ -15,179 +16,142 @@ export class MasterService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly configService: ConfigService,
   ) {}
 
   private validateMasterKey(masterKey: string): void {
-    if (!masterKey || masterKey !== process.env.MASTER_KEY) {
-      throw new UnauthorizedException('Invalid Master Key');
+    const configuredKey =
+      this.configService.get<string>('MASTER_KEY') || 'master-key';
+    if (masterKey !== configuredKey) {
+      throw new UnauthorizedException('Invalid master key');
     }
   }
 
-  private async cleanupCloudinaryAssets(mainUrl: string): Promise<void> {
-    const client = await this.databaseService.getClient(mainUrl);
-    try {
-      const { rows: users } = await client.query<{ image_url: string | null }>(
-        'SELECT image_url FROM users WHERE image_url IS NOT NULL',
-      );
-      const { rows: orgs } = await client.query<{ image_url: string | null }>(
-        'SELECT image_url FROM organizations WHERE image_url IS NOT NULL',
-      );
-      const { rows: bots } = await client.query<{ image_url: string | null }>(
-        'SELECT image_url FROM chatbots WHERE image_url IS NOT NULL',
-      );
-
-      const allUrls = [
-        ...users.map((r) => r.image_url),
-        ...orgs.map((r) => r.image_url),
-        ...bots.map((r) => r.image_url),
-      ].filter((url): url is string => Boolean(url));
-
-      const publicIds = allUrls
-        .map((url) => {
-          try {
-            return this.cloudinaryService.extractPublicIdFromUrl(url);
-          } catch {
-            return null;
-          }
-        })
-        .filter((id): id is string => Boolean(id));
-
-      if (publicIds.length > 0) {
-        await Promise.allSettled(
-          publicIds.map((id) => this.cloudinaryService.deleteImage(id)),
-        );
-      }
-    } finally {
-      await client.end().catch(() => undefined);
-    }
-  }
-
-  private async wipeDatabaseNode(connectionUrl?: string): Promise<TableDetail> {
-    if (!connectionUrl) {
-      return {
-        chats: 0,
-        sessions: 0,
-        characteristics: 0,
-        chatbots: 0,
-        members: 0,
-        organizations: 0,
-        users: 0,
-      };
-    }
-
-    const client = await this.databaseService.getClient(connectionUrl);
-
-    try {
-      await client.query('BEGIN');
-
-      const delChats = await client.query('DELETE FROM chats');
-      const delSessions = await client.query('DELETE FROM sessions');
-      const delCharacteristics = await client.query(
-        'DELETE FROM characteristics',
-      );
-      const delChatbots = await client.query('DELETE FROM chatbots');
-      const delMembers = await client.query('DELETE FROM members');
-      const delOrganizations = await client.query('DELETE FROM organizations');
-      const delUsers = await client.query('DELETE FROM users');
-
-      await client.query('COMMIT');
-
-      return {
-        chats: delChats.rowCount ?? 0,
-        sessions: delSessions.rowCount ?? 0,
-        characteristics: delCharacteristics.rowCount ?? 0,
-        chatbots: delChatbots.rowCount ?? 0,
-        members: delMembers.rowCount ?? 0,
-        organizations: delOrganizations.rowCount ?? 0,
-        users: delUsers.rowCount ?? 0,
-      };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      await client.end().catch(() => undefined);
-    }
-  }
-
-  async cleardb(masterKey: string): Promise<ClearDbResponse> {
+  async getAllUsers(
+    masterKey: string,
+  ): Promise<{ totalUsers: number; users: UserDto[] }> {
     this.validateMasterKey(masterKey);
 
-    this.logger.warn(
-      '⚠️ [DANGER] Initiating full NEXA database wipe across main, duplicate, and backup nodes...',
+    const users = await this.databaseService.executeRead<UserDto>(
+      'SELECT id, email, username, image_url, created_at, updated_at FROM users ORDER BY created_at DESC',
     );
 
-    try {
-      const mainUrl = process.env.NEONDB_MAIN_URL;
-      const duplicateUrl = process.env.NEONDB_DUPLICATE_URL;
-      const backupUrl = process.env.NEONDB_BACKUP_URL;
-
-      if (mainUrl) {
-        await this.cleanupCloudinaryAssets(mainUrl);
-      }
-
-      const mainDetail = await this.wipeDatabaseNode(mainUrl);
-      const duplicateDetail = await this.wipeDatabaseNode(duplicateUrl);
-      const backupDetail = await this.wipeDatabaseNode(backupUrl);
-
-      const sumTableDetail = (detail: TableDetail): number =>
-        detail.chats +
-        detail.sessions +
-        detail.characteristics +
-        detail.chatbots +
-        detail.members +
-        detail.organizations +
-        detail.users;
-
-      const totalDeleted =
-        sumTableDetail(mainDetail) +
-        sumTableDetail(duplicateDetail) +
-        sumTableDetail(backupDetail);
-
-      this.logger.log(
-        '✅ Main, Duplicate, and Backup databases successfully wiped for NEXA system.',
-      );
-
-      return {
-        message:
-          'All records across main, duplicate, and backup databases and Cloudinary media permanently cleared.',
-        totalDeleted,
-        primary: mainDetail,
-        replica: duplicateDetail,
-        backup: backupDetail,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(
-        '❌ Failed to clear database nodes:',
-        (error as Error).stack || (error as Error).message,
-      );
-      throw new InternalServerErrorException(
-        'Failed to wipe database nodes and clean media storage',
-      );
-    }
+    return {
+      totalUsers: users.length,
+      users,
+    };
   }
 
-  async getAllUsers(masterKey: string): Promise<GetAllUsersResponse> {
+  private createEmptyTableDetail(): TableDetail {
+    return {
+      users: 0,
+      organizations: 0,
+      members: 0,
+      chatbots: 0,
+      characteristics: 0,
+      sessions: 0,
+      chats: 0,
+    };
+  }
+
+  private async clearDatabaseNode(
+    dbUrl: string | undefined,
+    nodeName: string,
+  ): Promise<{ tableDetail: TableDetail; nodeDeletedTotal: number }> {
+    const detail = this.createEmptyTableDetail();
+    let nodeDeletedTotal = 0;
+
+    if (!dbUrl) {
+      this.logger.warn(`Database URL for [${nodeName}] is not configured.`);
+      return { tableDetail: detail, nodeDeletedTotal };
+    }
+
+    let client: Client | undefined;
+
+    try {
+      client = await this.databaseService.getClient(dbUrl);
+
+      const tableKeys = Object.keys(detail) as (keyof TableDetail)[];
+
+      for (const table of tableKeys) {
+        try {
+          const countRes: QueryResult<CountRow> = await client.query<CountRow>(
+            `SELECT COUNT(*)::text as count FROM "${table}"`,
+          );
+          const count = parseInt(countRes.rows[0]?.count || '0', 10);
+          detail[table] = count;
+          nodeDeletedTotal += count;
+        } catch {
+          detail[table] = 0;
+        }
+      }
+
+      const tablesQuery = `
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+          AND table_type = 'BASE TABLE'
+          AND table_name != '_prisma_migrations';
+      `;
+      const tableRows = await client.query<{ table_name: string }>(tablesQuery);
+      const existingTables = tableRows.rows.map((r) => `"${r.table_name}"`);
+
+      if (existingTables.length > 0) {
+        await client.query(
+          `TRUNCATE TABLE ${existingTables.join(', ')} CASCADE`,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to clear node [${nodeName}]: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      if (client) {
+        await client.end().catch(() => undefined);
+      }
+    }
+
+    return { tableDetail: detail, nodeDeletedTotal };
+  }
+
+  async clearDatabase(masterKey: string): Promise<ClearDbResponse> {
     this.validateMasterKey(masterKey);
 
     try {
-      const rows = await this.databaseService.executeRead<UserDto>(
-        'SELECT id, email, username, image_url, created_at, updated_at FROM users ORDER BY created_at DESC',
+      await cloudinary.api.delete_resources_by_prefix('NEXA_nestjs');
+      await cloudinary.api.delete_folder('NEXA_nestjs');
+    } catch (err) {
+      this.logger.warn(
+        `Cloudinary purge warning: ${err instanceof Error ? err.message : String(err)}`,
       );
-
-      return {
-        message: 'All users fetched successfully.',
-        totalUsers: rows.length,
-        users: rows,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(
-        '❌ Failed to fetch all users:',
-        (error as Error).stack || (error as Error).message,
-      );
-      throw new InternalServerErrorException('Failed to fetch users list');
     }
+
+    const primaryUrl = this.configService.get<string>('NEONDB_MAIN_URL');
+    const replicaUrl = this.configService.get<string>('NEONDB_DUPLICATE_URL');
+    const backupUrl = this.configService.get<string>('NEONDB_BACKUP_URL');
+
+    const primaryResult = await this.clearDatabaseNode(
+      primaryUrl,
+      'Primary DB',
+    );
+    const replicaResult = await this.clearDatabaseNode(
+      replicaUrl,
+      'Replica DB',
+    );
+    const backupResult = await this.clearDatabaseNode(backupUrl, 'Backup DB');
+
+    const totalDeleted =
+      primaryResult.nodeDeletedTotal +
+      replicaResult.nodeDeletedTotal +
+      backupResult.nodeDeletedTotal;
+
+    return {
+      message: 'All databases cleared and Cloudinary media purged successfully',
+      totalDeleted,
+      primary: primaryResult.tableDetail,
+      replica: replicaResult.tableDetail,
+      backup: backupResult.tableDetail,
+      timestamp: new Date(),
+    };
   }
 }

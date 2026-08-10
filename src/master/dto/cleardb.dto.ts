@@ -1,4 +1,8 @@
+import { IsNotEmpty, IsString } from 'class-validator';
+
 export class ClearDbRequest {
+  @IsString()
+  @IsNotEmpty({ message: 'masterKey cannot be empty' })
   masterKey!: string;
 }
 
