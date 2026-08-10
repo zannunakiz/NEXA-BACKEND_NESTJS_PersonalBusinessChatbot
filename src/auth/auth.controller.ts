@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -64,7 +65,7 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken);
   }
 
-  @Post('me')
+  @Get('me')
   @UseGuards(JwtAuthGuard)
   async me(@Request() req: RequestWithUser): Promise<JwtUser> {
     return this.authService.getProfile(req.user.id);

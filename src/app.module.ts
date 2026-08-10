@@ -3,7 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import 'dotenv/config';
+import { Request } from 'express';
 import { WinstonModule } from 'nest-winston';
+import { ClsModule } from 'nestjs-cls';
+import { v4 as uuidv4 } from 'uuid';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -21,6 +24,23 @@ import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        generateId: true,
+        idGenerator: (req: Request) => {
+          const existingId = req.headers['x-request-id'];
+          const headerValue = Array.isArray(existingId)
+            ? existingId[0]
+            : existingId;
+          return headerValue || uuidv4();
+        },
+        setup: (cls) => {
+          cls.set('requestId', cls.getId());
+        },
+      },
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),

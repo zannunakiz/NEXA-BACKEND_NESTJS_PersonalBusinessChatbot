@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ClsServiceManager } from 'nestjs-cls';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -13,6 +14,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+
+    const cls = ClsServiceManager.getClsService();
+    const requestId = cls?.get<string>('requestId') ?? undefined;
 
     const status =
       exception instanceof HttpException
@@ -53,6 +57,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
+      requestId,
       timestamp: new Date().toISOString(),
       path: request.url,
       error: errorOutput,

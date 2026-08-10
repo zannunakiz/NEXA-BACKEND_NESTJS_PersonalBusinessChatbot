@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import 'dotenv/config';
 import { NextFunction, Request, Response } from 'express';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { ClsService } from 'nestjs-cls';
 import cluster from 'node:cluster';
 
 import { AppModule } from './app.module';
@@ -37,19 +38,23 @@ async function bootstrap() {
     app.useGlobalFilters(new AllExceptionsFilter());
 
     const httpLogger = new Logger('HTTP');
+    const clsService = app.get(ClsService); // Ambil ClsService dari NestJS Container
 
     app.use((req: Request, res: Response, next: NextFunction) => {
       const { method, originalUrl } = req;
       const startTime = Date.now();
 
       res.on('finish', () => {
+        // Ambil ID langsung dari instance ClsService yang di-inject
+        const requestId = clsService.getId() || 'N/A';
+
         const { statusCode } = res;
         const duration = Date.now() - startTime;
         const errorMessage = res.locals.errorMessage
           ? ` | Error: ${res.locals.errorMessage}`
           : '';
 
-        const logMessage = `${method} ${originalUrl} ${statusCode} - ${duration}ms${errorMessage}`;
+        const logMessage = `[${requestId}] ${method} ${originalUrl} ${statusCode} - ${duration}ms${errorMessage}`;
 
         if (statusCode >= 500) {
           httpLogger.error(logMessage);
