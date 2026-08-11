@@ -1,8 +1,13 @@
--- =============================================
+-- ============================================================
 -- NEXA CHATBOT SYSTEM - NEONDB POSTGRES SCHEMA
--- Version: 3.1.0
+-- Version: 3.2.0 (Fixed Foreign Key Deferrability)
 -- Engine: PostgreSQL (NeonDB Compatible)
--- =============================================
+-- ============================================================
+-- CHANGES:
+--   - Made fk_member_organization DEFERRABLE INITIALLY DEFERRED
+--     to allow out-of-order inserts within transactions (fixes backup sync errors).
+--   - All other constraints remain immediate by default.
+-- ============================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -74,10 +79,15 @@ CREATE TABLE members (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
+    -- DEFERRABLE allows the constraint to be checked at transaction commit,
+    -- enabling out-of-order inserts (e.g., members before organizations)
     CONSTRAINT fk_member_organization FOREIGN KEY (organization_id) 
-        REFERENCES organizations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        REFERENCES organizations(id) ON DELETE CASCADE ON UPDATE CASCADE
+        DEFERRABLE INITIALLY DEFERRED,
+    
     CONSTRAINT fk_member_user FOREIGN KEY (user_id) 
         REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    
     CONSTRAINT unique_member_org_user UNIQUE (organization_id, user_id)
 );
 

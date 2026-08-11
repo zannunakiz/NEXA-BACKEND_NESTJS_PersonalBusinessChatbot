@@ -2,55 +2,39 @@
   "info": {
     "_postman_id": "a8e9d123-b456-4789-a101-112233445566",
     "name": "NEXA API nestjs",
-    "description": "Production-ready Postman collection for NEXA Chatbot System with automated JWT token handling and environment variables.",
+    "description": "Production-ready Postman collection with automated JWT token handling.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "accessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "refreshToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "masterKey",
-      "value": "master-key",
-      "type": "string"
-    },
-    {
-      "key": "userId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "userEmail",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "username",
-      "value": "",
-      "type": "string"
-    }
+    {"key": "baseUrl", "value": "http://localhost:3000", "type": "string"},
+    {"key": "accessToken", "value": "", "type": "string"},
+    {"key": "refreshToken", "value": "", "type": "string"},
+    {"key": "masterKey", "value": "master-key", "type": "string"},
+    {"key": "userId", "value": "", "type": "string"},
+    {"key": "userEmail", "value": "", "type": "string"},
+    {"key": "username", "value": "", "type": "string"},
+    {"key": "organizationId", "value": "", "type": "string"},
+    {"key": "memberId", "value": "", "type": "string"}
   ],
   "event": [
     {
       "listen": "prerequest",
       "script": {
         "exec": [
-          "console.log('📌 Pre-request - Current tokens:', {",
-          "    accessToken: pm.collectionVariables.get('accessToken') ? '✓ exists' : '✗ empty',",
-          "    refreshToken: pm.collectionVariables.get('refreshToken') ? '✓ exists' : '✗ empty'",
-          "});"
+          "// Auto-generate unique credentials for registration if needed",
+          "if (request.body && request.body.mode === 'raw') {",
+          "  try {",
+          "    let body = JSON.parse(request.body.raw);",
+          "    if (body.email && body.email.includes('@')) {",
+          "      body.email = `user_${Date.now()}@nuxa.ai`;",
+          "      request.body.raw = JSON.stringify(body);",
+          "    }",
+          "    if (body.username && body.username !== '') {",
+          "      body.username = `user_${Date.now().toString(36)}`;",
+          "      request.body.raw = JSON.stringify(body);",
+          "    }",
+          "  } catch(e) {}",
+          "}"
         ],
         "type": "text/javascript"
       }
@@ -59,86 +43,22 @@
       "listen": "test",
       "script": {
         "exec": [
-          "console.log('📌 Response Status:', pm.response.code);",
-          "console.log('📌 Response Body:', pm.response.text());",
-          "",
           "if (pm.response.code === 200 || pm.response.code === 201) {",
-          "    try {",
-          "        var jsonData = pm.response.json();",
-          "        console.log('📌 Parsed Response:', JSON.stringify(jsonData, null, 2));",
-          "        ",
-          "        // Extract from data object (new structure)",
-          "        var responseData = jsonData.data || jsonData;",
-          "        ",
-          "        // FORCE UPDATE accessToken",
-          "        if (responseData.accessToken) {",
-          "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
-          "            console.log('✅ ACCESS TOKEN SET:', responseData.accessToken.substring(0, 20) + '...');",
-          "        } else if (jsonData.accessToken) {",
-          "            pm.collectionVariables.set('accessToken', jsonData.accessToken);",
-          "            console.log('✅ ACCESS TOKEN SET (root):', jsonData.accessToken.substring(0, 20) + '...');",
-          "        } else {",
-          "            console.log('❌ No accessToken found in response');",
-          "        }",
-          "        ",
-          "        // FORCE UPDATE refreshToken",
-          "        if (responseData.refreshToken) {",
-          "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
-          "            console.log('✅ REFRESH TOKEN SET:', responseData.refreshToken.substring(0, 20) + '...');",
-          "        } else if (jsonData.refreshToken) {",
-          "            pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
-          "            console.log('✅ REFRESH TOKEN SET (root):', jsonData.refreshToken.substring(0, 20) + '...');",
-          "        } else {",
-          "            console.log('❌ No refreshToken found in response');",
-          "        }",
-          "        ",
-          "        // FORCE UPDATE user data - check both data.user and root user",
-          "        var userData = null;",
-          "        if (responseData.user) {",
-          "            userData = responseData.user;",
-          "            console.log('📌 User data found in data.user');",
-          "        } else if (jsonData.user) {",
-          "            userData = jsonData.user;",
-          "            console.log('📌 User data found in root.user');",
-          "        } else if (responseData.id || responseData.email) {",
-          "            userData = responseData;",
-          "            console.log('📌 User data found in data root');",
-          "        }",
-          "        ",
-          "        if (userData) {",
-          "            if (userData.id) {",
-          "                pm.collectionVariables.set('userId', userData.id);",
-          "                console.log('✅ User ID set:', userData.id);",
-          "            }",
-          "            if (userData.email) {",
-          "                pm.collectionVariables.set('userEmail', userData.email);",
-          "                console.log('✅ User Email set:', userData.email);",
-          "            }",
-          "            if (userData.username) {",
-          "                pm.collectionVariables.set('username', userData.username);",
-          "                console.log('✅ Username set:', userData.username);",
-          "            }",
-          "            if (userData.image_url) {",
-          "                console.log('📌 User image:', userData.image_url);",
-          "            }",
-          "        }",
-          "        ",
-          "        // VERIFY variables were set",
-          "        var finalAccess = pm.collectionVariables.get('accessToken');",
-          "        var finalRefresh = pm.collectionVariables.get('refreshToken');",
-          "        console.log('📌 FINAL VARIABLE STATE:', {",
-          "            accessToken: finalAccess ? '✓ (' + finalAccess.substring(0, 15) + '...)' : '✗ EMPTY',",
-          "            refreshToken: finalRefresh ? '✓ (' + finalRefresh.substring(0, 15) + '...)' : '✗ EMPTY',",
-          "            userId: pm.collectionVariables.get('userId') || '✗ EMPTY',",
-          "            userEmail: pm.collectionVariables.get('userEmail') || '✗ EMPTY',",
-          "            username: pm.collectionVariables.get('username') || '✗ EMPTY'",
-          "        });",
-          "        ",
-          "    } catch(e) {",
-          "        console.log('❌ Error processing response:', e.message);",
-          "    }",
-          "} else {",
-          "    console.log('❌ Response code not 200/201, skipping variable update');",
+          "  try {",
+          "    let json = pm.response.json();",
+          "    let data = json.data || json;",
+          "    // Update tokens",
+          "    if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+          "    if (data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);",
+          "    // Update user data",
+          "    let user = data.user || data;",
+          "    if (user.id) pm.collectionVariables.set('userId', user.id);",
+          "    if (user.email) pm.collectionVariables.set('userEmail', user.email);",
+          "    if (user.username) pm.collectionVariables.set('username', user.username);",
+          "    // Update org/member IDs if present",
+          "    if (data.id && !data.user) pm.collectionVariables.set('organizationId', data.id);",
+          "    if (Array.isArray(data) && data.length && data[0].id) pm.collectionVariables.set('memberId', data[0].id);",
+          "  } catch(e) {}",
           "}"
         ],
         "type": "text/javascript"
@@ -154,11 +74,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
-            }
+            "url": {"raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"]}
           },
           "response": []
         }
@@ -169,277 +85,51 @@
       "item": [
         {
           "name": "Register User",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200 || pm.response.code === 201) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        ",
-                  "        if (responseData.accessToken) {",
-                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
-                  "        }",
-                  "        if (responseData.refreshToken) {",
-                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
-                  "        }",
-                  "        ",
-                  "        var userData = responseData.user || responseData;",
-                  "        if (userData.id) pm.collectionVariables.set('userId', userData.id);",
-                  "        if (userData.email) pm.collectionVariables.set('userEmail', userData.email);",
-                  "        if (userData.username) pm.collectionVariables.set('username', userData.username);",
-                  "        ",
-                  "        console.log('✅ REGISTER SUCCESS - Variables updated');",
-                  "    } catch(e) {",
-                  "        console.log('Error:', e.message);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@nuxa.ai\",\n  \"username\": \"nuxauser\",\n  \"password\": \"SecurePass123!\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "register"]
-            }
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\",\"username\":\"nuxauser\",\"password\":\"SecurePass123!\"}"},
+            "url": {"raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"]}
           },
           "response": []
         },
         {
           "name": "Login User",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "console.log('🔐 LOGIN ATTEMPT');",
-                  "",
-                  "if (pm.response.code === 200 || pm.response.code === 201) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        console.log('Login response:', JSON.stringify(jsonData, null, 2));",
-                  "        ",
-                  "        // Extract from data object",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        ",
-                  "        // FORCE SET accessToken from data",
-                  "        if (responseData.accessToken) {",
-                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
-                  "            console.log('✅ AccessToken SET from data');",
-                  "        } else if (jsonData.accessToken) {",
-                  "            pm.collectionVariables.set('accessToken', jsonData.accessToken);",
-                  "            console.log('✅ AccessToken SET from root');",
-                  "        } else {",
-                  "            console.log('❌ No accessToken in response!');",
-                  "            console.log('Response keys:', Object.keys(jsonData));",
-                  "            if (jsonData.data) console.log('Data keys:', Object.keys(jsonData.data));",
-                  "        }",
-                  "        ",
-                  "        // FORCE SET refreshToken from data",
-                  "        if (responseData.refreshToken) {",
-                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
-                  "            console.log('✅ RefreshToken SET from data');",
-                  "        } else if (jsonData.refreshToken) {",
-                  "            pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
-                  "            console.log('✅ RefreshToken SET from root');",
-                  "        } else {",
-                  "            console.log('❌ No refreshToken in response!');",
-                  "        }",
-                  "        ",
-                  "        // Extract user data - check multiple locations",
-                  "        var userData = null;",
-                  "        if (responseData.user) {",
-                  "            userData = responseData.user;",
-                  "        } else if (jsonData.user) {",
-                  "            userData = jsonData.user;",
-                  "        } else if (responseData.id) {",
-                  "            userData = responseData;",
-                  "        }",
-                  "        ",
-                  "        if (userData) {",
-                  "            if (userData.id) {",
-                  "                pm.collectionVariables.set('userId', userData.id);",
-                  "                console.log('✅ User ID:', userData.id);",
-                  "            }",
-                  "            if (userData.email) {",
-                  "                pm.collectionVariables.set('userEmail', userData.email);",
-                  "                console.log('✅ Email:', userData.email);",
-                  "            }",
-                  "            if (userData.username) {",
-                  "                pm.collectionVariables.set('username', userData.username);",
-                  "                console.log('✅ Username:', userData.username);",
-                  "            }",
-                  "        }",
-                  "        ",
-                  "        // VERIFY - Check if variables actually set",
-                  "        var verifyAccess = pm.collectionVariables.get('accessToken');",
-                  "        var verifyRefresh = pm.collectionVariables.get('refreshToken');",
-                  "        console.log('🔍 VERIFICATION - AccessToken:', verifyAccess ? '✓ EXISTS' : '✗ EMPTY');",
-                  "        console.log('🔍 VERIFICATION - RefreshToken:', verifyRefresh ? '✓ EXISTS' : '✗ EMPTY');",
-                  "        ",
-                  "    } catch(e) {",
-                  "        console.log('❌ Parse error:', e.message);",
-                  "    }",
-                  "} else {",
-                  "    console.log('❌ Login failed with status:', pm.response.code);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"emailOrUsername\": \"nuxauser\",\n  \"password\": \"SecurePass123!\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "login"]
-            }
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"emailOrUsername\":\"nuxauser\",\"password\":\"SecurePass123!\"}"},
+            "url": {"raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"]}
           },
           "response": []
         },
         {
           "name": "Refresh Token",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200 || pm.response.code === 201) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        ",
-                  "        if (responseData.accessToken) {",
-                  "            pm.collectionVariables.set('accessToken', responseData.accessToken);",
-                  "            console.log('✅ New AccessToken generated');",
-                  "        }",
-                  "        if (responseData.refreshToken) {",
-                  "            pm.collectionVariables.set('refreshToken', responseData.refreshToken);",
-                  "            console.log('✅ New RefreshToken generated');",
-                  "        }",
-                  "    } catch(e) {",
-                  "        console.log('Error:', e.message);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "refresh"]
-            }
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"refreshToken\":\"{{refreshToken}}\"}"},
+            "url": {"raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"]}
           },
           "response": []
         },
         {
           "name": "Get User Profile (Me)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        var userData = responseData.user || responseData;",
-                  "        ",
-                  "        if (userData.id) pm.collectionVariables.set('userId', userData.id);",
-                  "        if (userData.email) pm.collectionVariables.set('userEmail', userData.email);",
-                  "        if (userData.username) pm.collectionVariables.set('username', userData.username);",
-                  "        console.log('✅ Profile synced');",
-                  "    } catch(e) {",
-                  "        console.log('Error:', e.message);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "me"]
-            }
+            "url": {"raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"]}
           },
           "response": []
         },
         {
           "name": "Logout User",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
             "method": "POST",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "logout"]
-            }
+            "url": {"raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"]}
           },
           "response": []
         }
@@ -450,63 +140,138 @@
       "item": [
         {
           "name": "Edit User Profile",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        var userData = responseData.user || responseData;",
-                  "        ",
-                  "        if (userData.username) {",
-                  "            pm.collectionVariables.set('username', userData.username);",
-                  "            console.log('✅ Username updated to:', userData.username);",
-                  "        }",
-                  "    } catch(e) {",
-                  "        console.log('Error:', e.message);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
             "method": "PUT",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                {
-                  "key": "username",
-                  "value": "",
-                  "type": "text"
-                },
-                {
-                  "key": "image",
-                  "type": "file",
-                  "src": []
-                }
+                {"key": "username", "value": "", "type": "text"},
+                {"key": "image", "type": "file", "src": []}
               ]
             },
-            "url": {
-              "raw": "{{baseUrl}}/user",
-              "host": ["{{baseUrl}}"],
-              "path": ["user"]
-            }
+            "url": {"raw": "{{baseUrl}}/user", "host": ["{{baseUrl}}"], "path": ["user"]}
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ORGANIZATION",
+      "item": [
+        {
+          "name": "Create Organization",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"name\":\"My Org\",\"description\":\"Test org\"}"},
+            "url": {"raw": "{{baseUrl}}/organization", "host": ["{{baseUrl}}"], "path": ["organization"]}
+          },
+          "response": []
+        },
+        {
+          "name": "List My Organizations",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization", "host": ["{{baseUrl}}"], "path": ["organization"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Get Organization Details",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Update Organization",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"name\":\"Updated Org\",\"description\":\"New desc\"}"},
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Organization (Owner only)",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "List Members",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/members", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "members"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Invite Member",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"invitee@example.com\",\"role\":\"member\"}"},
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/members/invite", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "members", "invite"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"role\":\"admin\"}"},
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/members/{{memberId}}/role", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "members", "{{memberId}}", "role"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Member",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/members/{{memberId}}", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "members", "{{memberId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Leave Organization",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/leave", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "leave"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer Ownership",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"newOwnerId\":\"{{userId}}\"}"},
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/transfer-ownership", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "transfer-ownership"]}
           },
           "response": []
         }
@@ -517,91 +282,21 @@
       "item": [
         {
           "name": "Get All Users",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    try {",
-                  "        var jsonData = pm.response.json();",
-                  "        var responseData = jsonData.data || jsonData;",
-                  "        ",
-                  "        if (responseData.masterKey) {",
-                  "            pm.collectionVariables.set('masterKey', responseData.masterKey);",
-                  "            console.log('✅ MasterKey updated');",
-                  "        }",
-                  "        if (responseData.users && Array.isArray(responseData.users)) {",
-                  "            pm.collectionVariables.set('userCount', responseData.users.length);",
-                  "            console.log(`✅ ${responseData.users.length} users found`);",
-                  "        }",
-                  "    } catch(e) {",
-                  "        console.log('Error:', e.message);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"masterKey\": \"{{masterKey}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/master/getallusers",
-              "host": ["{{baseUrl}}"],
-              "path": ["master", "getallusers"]
-            }
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"masterKey\":\"{{masterKey}}\"}"},
+            "url": {"raw": "{{baseUrl}}/master/getallusers", "host": ["{{baseUrl}}"], "path": ["master", "getallusers"]}
           },
           "response": []
         },
         {
           "name": "Clear Database (DANGER)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    pm.collectionVariables.set('userId', '');",
-                  "    pm.collectionVariables.set('userEmail', '');",
-                  "    pm.collectionVariables.set('username', '');",
-                  "    pm.collectionVariables.set('accessToken', '');",
-                  "    pm.collectionVariables.set('refreshToken', '');",
-                  "    pm.collectionVariables.set('userCount', '0');",
-                  "    console.log('⚠️ Database cleared - All variables reset');",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"masterKey\": \"{{masterKey}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/master/cleardb",
-              "host": ["{{baseUrl}}"],
-              "path": ["master", "cleardb"]
-            }
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"masterKey\":\"{{masterKey}}\"}"},
+            "url": {"raw": "{{baseUrl}}/master/cleardb", "host": ["{{baseUrl}}"], "path": ["master", "cleardb"]}
           },
           "response": []
         }
