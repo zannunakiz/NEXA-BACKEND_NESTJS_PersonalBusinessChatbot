@@ -223,6 +223,22 @@
           "response": []
         },
         {
+          "name": "Update Organization Banner",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "image", "type": "file", "src": []}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/banner", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "banner"]}
+          },
+          "response": []
+        },
+        {
           "name": "Delete Organization (Owner only)",
           "request": {
             "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},

@@ -1,3 +1,4 @@
+// src/organization/dto/organization.dto.ts
 import {
   IsEmail,
   IsIn,
@@ -13,7 +14,6 @@ export enum MemberRole {
   MEMBER = 'member',
 }
 
-/** Roles assignable via invite or role update (owner requires transfer endpoint). */
 export const ASSIGNABLE_MEMBER_ROLES = [
   MemberRole.ADMIN,
   MemberRole.MEMBER,
@@ -22,7 +22,7 @@ export const ASSIGNABLE_MEMBER_ROLES = [
 export class CreateOrganizationDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()
@@ -41,18 +41,18 @@ export class UpdateOrganizationDto {
 
 export class InviteMemberDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsIn(ASSIGNABLE_MEMBER_ROLES)
-  role: MemberRole.ADMIN | MemberRole.MEMBER;
+  role!: MemberRole.ADMIN | MemberRole.MEMBER;
 }
 
 export class UpdateRoleDto {
   @IsIn(ASSIGNABLE_MEMBER_ROLES)
-  role: MemberRole.ADMIN | MemberRole.MEMBER;
+  role!: MemberRole.ADMIN | MemberRole.MEMBER;
 }
 
 export class TransferOwnershipDto {
   @IsUUID()
-  newOwnerId: string;
+  newOwnerId!: string;
 }

@@ -9,9 +9,13 @@ import {
   Post,
   Put,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request as ExpressRequest } from 'express';
+import 'multer';
 import { JwtAuthGuard, JwtUser } from '../auth/jwt-auth.guard';
 import {
   CreateOrganizationDto,
@@ -98,6 +102,21 @@ export class OrganizationController {
       dto.description,
     );
     return { message: 'Organization updated successfully', data: org };
+  }
+
+  @Put(':id/banner')
+  @UseInterceptors(FileInterceptor('image'))
+  async updateBanner(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: RequestWithUser,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ message: string; data: OrganizationRow }> {
+    const org = await this.organizationService.updateOrganizationBanner(
+      id,
+      req.user.id,
+      file,
+    );
+    return { message: 'Organization banner updated successfully', data: org };
   }
 
   @Delete(':id')

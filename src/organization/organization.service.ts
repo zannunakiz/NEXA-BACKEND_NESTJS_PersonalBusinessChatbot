@@ -7,7 +7,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import 'multer';
 import { v4 as uuidv4 } from 'uuid';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { DatabaseService } from '../database/database.service';
 import { MemberRole } from './dto/organization.dto';
 
@@ -38,7 +40,10 @@ export interface OrganizationRow {
 export class OrganizationService {
   private readonly logger = new Logger(OrganizationService.name);
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   // ---------- CREATE ----------
   async createOrganization(
@@ -46,7 +51,6 @@ export class OrganizationService {
     name: string,
     description?: string,
   ): Promise<OrganizationRow> {
-    // Check if user already has an organization with this name
     const existing =
       await this.databaseService.executeReadMain<OrganizationRow>(
         'SELECT id FROM organizations WHERE owner_id = $1 AND name = $2',
@@ -60,13 +64,11 @@ export class OrganizationService {
 
     const orgId = uuidv4();
 
-    // Insert organization (dual-write)
     await this.databaseService.executeWrite(
       'INSERT INTO organizations (id, owner_id, name, description) VALUES ($1, $2, $3, $4)',
       [orgId, ownerId, name, description || null],
     );
 
-    // Add owner as a member (dual-write)
     await this.databaseService.executeWrite(
       'INSERT INTO members (organization_id, user_id, role) VALUES ($1, $2, $3)',
       [orgId, ownerId, MemberRole.OWNER],
@@ -142,7 +144,6 @@ export class OrganizationService {
       `🔍 updateOrganization called: org=${organizationId}, user=${userId}`,
     );
 
-    // 1. Get organization owner_id
     const orgRow = await this.databaseService.executeReadMain<{
       id: string;
       owner_id: string;
@@ -157,7 +158,6 @@ export class OrganizationService {
     const ownerId = orgRow[0].owner_id;
     this.logger.log(`📌 Owner ID: ${ownerId}, Requesting User: ${userId}`);
 
-    // 2. Check if the requesting user is the owner
     if (ownerId !== userId) {
       this.logger.warn(`⛔ User ${userId} is NOT the owner – rejecting update`);
       throw new ForbiddenException(
@@ -165,7 +165,6 @@ export class OrganizationService {
       );
     }
 
-    // 3. Double-check via members table
     const memberRows = await this.databaseService.executeReadMain<{
       role: MemberRole;
     }>('SELECT role FROM members WHERE organization_id = $1 AND user_id = $2', [
@@ -197,7 +196,6 @@ export class OrganizationService {
       }
     }
 
-    // 4. Build update query
     const updates: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -222,17 +220,105 @@ export class OrganizationService {
     return this.getOrganizationById(organizationId);
   }
 
+  // ---------- UPDATE BANNER (OWNER ONLY) ----------
+  async updateOrganizationBanner(
+    organizationId: string,
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<OrganizationRow> {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    this.logger.log(
+      `🔍 updateOrganizationBanner called: org=${organizationId}, user=${userId}`,
+    );
+
+    const orgRow = await this.databaseService.executeReadMain<{
+      id: string;
+      owner_id: string;
+      image_url: string | null;
+    }>('SELECT id, owner_id, image_url FROM organizations WHERE id = $1', [
+      organizationId,
+    ]);
+
+    if (orgRow.length === 0) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const ownerId = orgRow[0].owner_id;
+
+    if (ownerId !== userId) {
+      this.logger.warn(`⛔ User ${userId} is NOT the owner – rejecting update`);
+      throw new ForbiddenException(
+        'Only the owner can update the organization banner',
+      );
+    }
+
+    const memberRows = await this.databaseService.executeReadMain<{
+      role: MemberRole;
+    }>('SELECT role FROM members WHERE organization_id = $1 AND user_id = $2', [
+      organizationId,
+      userId,
+    ]);
+
+    if (memberRows.length === 0 || memberRows[0].role !== MemberRole.OWNER) {
+      this.logger.warn(
+        `⛔ User ${userId} is not marked as owner in members table`,
+      );
+      throw new ForbiddenException(
+        'Only the owner can update the organization banner',
+      );
+    }
+
+    const currentImageUrl = orgRow[0].image_url;
+
+    let finalImageUrl: string;
+
+    try {
+      if (currentImageUrl) {
+        await this.cloudinaryService.deleteImage(currentImageUrl);
+      }
+
+      const uploadResult = await this.cloudinaryService.uploadImage(
+        file,
+        'NEXA_nestjs/organizations',
+      );
+      finalImageUrl = uploadResult.secure_url;
+    } catch (error) {
+      this.logger.error(
+        `Cloudinary upload failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException(
+        'Failed to upload image to Cloudinary. Please try again.',
+      );
+    }
+
+    await this.databaseService.executeWrite(
+      'UPDATE organizations SET image_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [finalImageUrl, organizationId],
+    );
+
+    return this.getOrganizationById(organizationId);
+  }
+
   // ---------- DELETE (OWNER ONLY, NO OTHER MEMBERS) ----------
   async deleteOrganization(
     organizationId: string,
     userId: string,
   ): Promise<void> {
     const orgRow = await this.databaseService.executeReadMain<{
+      id: string;
       owner_id: string;
-    }>('SELECT owner_id FROM organizations WHERE id = $1', [organizationId]);
+      image_url: string | null;
+    }>('SELECT id, owner_id, image_url FROM organizations WHERE id = $1', [
+      organizationId,
+    ]);
+
     if (orgRow.length === 0) {
       throw new NotFoundException('Organization not found');
     }
+
     if (orgRow[0].owner_id !== userId) {
       throw new ForbiddenException(
         'Only the owner can delete the organization',
@@ -245,6 +331,20 @@ export class OrganizationService {
         'Cannot delete organization with other members. Remove or transfer ownership first.',
       );
     }
+
+    const imageUrl = orgRow[0].image_url;
+
+    if (imageUrl) {
+      try {
+        await this.cloudinaryService.deleteImage(imageUrl);
+        this.logger.log(`✅ Deleted Cloudinary image: ${imageUrl}`);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to delete Cloudinary image: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     await this.databaseService.executeWrite(
       'DELETE FROM organizations WHERE id = $1',
       [organizationId],
@@ -258,7 +358,6 @@ export class OrganizationService {
     email: string,
     role: MemberRole,
   ): Promise<MemberRow[]> {
-    // 1. Check inviter permissions (owner or admin)
     const inviterRows = await this.databaseService.executeReadMain<{
       role: MemberRole;
     }>('SELECT role FROM members WHERE organization_id = $1 AND user_id = $2', [
@@ -273,7 +372,6 @@ export class OrganizationService {
       throw new ForbiddenException('Only owners and admins can invite members');
     }
 
-    // 2. Find the invited user by email
     const userRows = await this.databaseService.executeReadMain<UserRow>(
       'SELECT id, email FROM users WHERE email = $1',
       [email],
@@ -283,7 +381,6 @@ export class OrganizationService {
     }
     const targetUserId = userRows[0].id;
 
-    // 3. Prevent inviting yourself
     if (targetUserId === inviterId) {
       throw new BadRequestException('You cannot invite yourself');
     }
@@ -294,14 +391,11 @@ export class OrganizationService {
       );
     }
 
-    // 4. DELETE any existing member record (from both databases via dual-write)
-    //    This ensures we clean up any stale records before insert.
     await this.databaseService.executeWrite(
       'DELETE FROM members WHERE organization_id = $1 AND user_id = $2',
       [organizationId, targetUserId],
     );
 
-    // 5. Insert the new member (dual-write)
     await this.databaseService.executeWrite(
       'INSERT INTO members (organization_id, user_id, role) VALUES ($1, $2, $3)',
       [organizationId, targetUserId, role],
