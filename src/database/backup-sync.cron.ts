@@ -12,6 +12,21 @@ interface CountRow {
   count: string;
 }
 
+const SYNC_TABLE_ORDER = [
+  'users',
+  'organizations',
+  'chatbots',
+  'members',
+  'characteristics',
+  'sessions',
+  'chats',
+];
+
+function tablePriority(tableName: string): number {
+  const index = SYNC_TABLE_ORDER.indexOf(tableName);
+  return index === -1 ? SYNC_TABLE_ORDER.length : index;
+}
+
 @Injectable()
 export class BackupSyncCron {
   private readonly logger = new Logger(BackupSyncCron.name);
@@ -117,7 +132,11 @@ export class BackupSyncCron {
           `TRUNCATE TABLE ${formattedTableNames} CASCADE`,
         );
 
-        for (const table of tableNames) {
+        const orderedTables = [...tableNames].sort(
+          (a, b) => tablePriority(a) - tablePriority(b),
+        );
+
+        for (const table of orderedTables) {
           const dataResult: QueryResult<Record<string, unknown>> =
             await mainClient.query<Record<string, unknown>>(
               `SELECT * FROM "${table}"`,
