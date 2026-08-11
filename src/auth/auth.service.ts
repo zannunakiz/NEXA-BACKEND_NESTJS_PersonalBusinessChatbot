@@ -1,12 +1,19 @@
 import {
+  BadRequestException,
   ConflictException,
+  GoneException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'node:crypto';
 import { DatabaseService } from '../database/database.service';
+import { EmailjsService } from '../emailjs/emailjs.service';
 import { RedisService } from '../redis/redis.service';
 import { JwtUser } from './jwt-auth.guard';
 
@@ -42,13 +49,27 @@ function toDuration(
   return fallback;
 }
 
+const OTP_VALIDITY_MINUTES = 15;
+const MIN_PASSWORD_LENGTH = 8;
+
+interface OtpUserDbRow {
+  id: string;
+  email: string;
+  username: string;
+  otp_code: string | null;
+  otp_expired_at: Date | null;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly redis: RedisService,
+    private readonly emailjsService: EmailjsService,
   ) {}
 
   async register(
@@ -182,6 +203,91 @@ export class AuthService {
       image_url: users[0].image_url,
       created_at: users[0].created_at,
     };
+  }
+
+  async requestOtp(email: string): Promise<{ message: string }> {
+    const users = await this.databaseService.executeRead<OtpUserDbRow>(
+      'SELECT id, email, username FROM users WHERE email = $1 LIMIT 1',
+      [email],
+    );
+
+    if (users.length === 0) {
+      throw new NotFoundException('No account is registered with this email');
+    }
+
+    const user = users[0];
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const expiredAt = new Date(Date.now() + OTP_VALIDITY_MINUTES * 60 * 1000);
+
+    const sent = await this.emailjsService.sendEmail({
+      toEmail: user.email,
+      toName: user.username,
+      subject: 'Your NEXA password reset code',
+      message: `Your password reset code is ${otpCode}. It expires in ${OTP_VALIDITY_MINUTES} minutes.`,
+      templateParams: { otp_code: otpCode },
+    });
+
+    if (!sent) {
+      this.logger.error(`Failed to send OTP email to ${user.email}`);
+      throw new InternalServerErrorException(
+        'Unable to send the password reset code. Please try again later',
+      );
+    }
+
+    await this.databaseService.executeWrite(
+      'UPDATE users SET otp_code = $1, otp_expired_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [otpCode, expiredAt, user.id],
+    );
+
+    return {
+      message: `Password reset code sent successfully. It expires in ${OTP_VALIDITY_MINUTES} minutes`,
+    };
+  }
+
+  async resetPassword(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const users = await this.databaseService.executeRead<OtpUserDbRow>(
+      'SELECT id, email, otp_code, otp_expired_at FROM users WHERE email = $1 LIMIT 1',
+      [email],
+    );
+
+    if (users.length === 0) {
+      throw new NotFoundException('No account is registered with this email');
+    }
+
+    const user = users[0];
+
+    if (!user.otp_code || !user.otp_expired_at) {
+      throw new BadRequestException(
+        'No password reset code has been requested for this account',
+      );
+    }
+
+    if (new Date(user.otp_expired_at).getTime() < Date.now()) {
+      throw new GoneException('The password reset code has expired');
+    }
+
+    if (user.otp_code !== otp) {
+      throw new BadRequestException('The password reset code is incorrect');
+    }
+
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      throw new BadRequestException(
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      );
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await this.databaseService.executeWrite(
+      'UPDATE users SET password_hash = $1, otp_code = NULL, otp_expired_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [hashed, user.id],
+    );
+
+    return { message: 'Password reset successfully' };
   }
 
   private async generateTokens(userId: string): Promise<Tokens> {

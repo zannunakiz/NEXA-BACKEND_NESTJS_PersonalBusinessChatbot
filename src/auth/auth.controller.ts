@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { AuthService, RegisterResponse, Tokens } from './auth.service';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard, JwtUser } from './jwt-auth.guard';
 
 interface RegisterBody {
@@ -63,6 +65,24 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async refresh(@Body('refreshToken') refreshToken: string): Promise<Tokens> {
     return this.authService.refreshToken(refreshToken);
+  }
+
+  @Post('password-otp')
+  @HttpCode(HttpStatus.OK)
+  async requestOtp(@Body() body: RequestOtpDto): Promise<{ message: string }> {
+    return this.authService.requestOtp(body.email);
+  }
+
+  @Post('password-reset')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() body: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.resetPassword(
+      body.email,
+      body.otp,
+      body.newPassword,
+    );
   }
 
   @Get('me')

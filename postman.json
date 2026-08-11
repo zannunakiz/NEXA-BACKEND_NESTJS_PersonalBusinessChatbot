@@ -132,6 +132,26 @@
             "url": {"raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"]}
           },
           "response": []
+        },
+        {
+          "name": "Request Password Reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\"}"},
+            "url": {"raw": "{{baseUrl}}/auth/password-otp", "host": ["{{baseUrl}}"], "path": ["auth", "password-otp"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password With OTP",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\",\"otp\":\"123456\",\"newPassword\":\"NewSecurePass123!\"}"},
+            "url": {"raw": "{{baseUrl}}/auth/password-reset", "host": ["{{baseUrl}}"], "path": ["auth", "password-reset"]}
+          },
+          "response": []
         }
       ]
     },
