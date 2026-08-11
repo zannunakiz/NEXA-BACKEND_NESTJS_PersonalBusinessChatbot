@@ -16,7 +16,8 @@
     {"key": "organizationId", "value": "", "type": "string"},
     {"key": "memberId", "value": "", "type": "string"},
     {"key": "chatbotId", "value": "", "type": "string"},
-    {"key": "characteristicId", "value": "", "type": "string"}
+    {"key": "characteristicId", "value": "", "type": "string"},
+    {"key": "sessionId", "value": "", "type": "string"}
   ],
   "event": [
     {
@@ -65,6 +66,9 @@
           "    if (data.id && !data.user && path.indexOf('/chatbot') === 0) pm.collectionVariables.set('chatbotId', data.id);",
           "    // Update characteristic id on /characteristic create responses",
           "    if (data.id && !data.user && path.indexOf('/characteristic') === 0) pm.collectionVariables.set('characteristicId', data.id);",
+          "    // Update session/chatbot ids on /session create-or-resume responses",
+          "    if (data.session && data.session.id) pm.collectionVariables.set('sessionId', data.session.id);",
+          "    if (data.chatbot && data.chatbot.id) pm.collectionVariables.set('chatbotId', data.chatbot.id);",
           "    // Update member id only on member list responses",
           "    if (Array.isArray(data) && data.length && data[0].id && path.indexOf('/members') !== -1) pm.collectionVariables.set('memberId', data[0].id);",
           "  } catch(e) {}",
@@ -455,6 +459,61 @@
             "method": "DELETE",
             "header": [],
             "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}"]}
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CHAT SESSION",
+      "item": [
+        {
+          "name": "Create or Resume Session",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\"}"},
+            "url": {"raw": "{{baseUrl}}/session/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["session", "{{chatbotId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Send Chat Message",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\",\"customer_chat\":\"What are your opening hours?\"}"},
+            "url": {"raw": "{{baseUrl}}/chat/{{sessionId}}", "host": ["{{baseUrl}}"], "path": ["chat", "{{sessionId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete All Chats of Session",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\"}"},
+            "url": {"raw": "{{baseUrl}}/chat/{{sessionId}}", "host": ["{{baseUrl}}"], "path": ["chat", "{{sessionId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Session and Its Chats",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/session/remove/{{sessionId}}", "host": ["{{baseUrl}}"], "path": ["session", "remove", "{{sessionId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete All Sessions of Chatbot",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/session/all/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["session", "all", "{{chatbotId}}"]}
           },
           "response": []
         }

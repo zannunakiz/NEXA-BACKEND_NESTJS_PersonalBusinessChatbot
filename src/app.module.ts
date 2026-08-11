@@ -26,6 +26,8 @@ import { UserModule } from './user/user.module';
 import { OrganizationModule } from './organization/organization.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { CharacteristicModule } from './characteristic/characteristic.module';
+import { SessionModule } from './session/session.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { CharacteristicModule } from './characteristic/characteristic.module';
     OrganizationModule,
     ChatbotModule,
     CharacteristicModule,
+    SessionModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
