@@ -20,8 +20,10 @@ import { DatabaseModule } from './database/database.module';
 import { EmailjsModule } from './emailjs/emailjs.module';
 import { HealthModule } from './health/health.module';
 import { MasterModule } from './master/master.module';
+import { OpenrouterModule } from './openrouter/openrouter.module';
 import { RedisModule } from './redis/redis.module';
 import { UserModule } from './user/user.module';
+import { OrganizationModule } from './organization/organization.module';
 
 @Module({
   imports: [
@@ -56,6 +58,8 @@ import { UserModule } from './user/user.module';
     EmailjsModule,
     CustomArcjetModule,
     UserModule,
+    OpenrouterModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [

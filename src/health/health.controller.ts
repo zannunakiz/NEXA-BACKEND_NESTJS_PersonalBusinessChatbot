@@ -10,6 +10,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import cluster from 'node:cluster';
 import { DatabaseService } from '../database/database.service';
 import { EmailjsService } from '../emailjs/emailjs.service';
+import { OpenRouterService } from '../openrouter/openrouter.service';
 import { RedisService } from '../redis/redis.service';
 
 interface CloudinaryPingResponse {
@@ -24,6 +25,7 @@ export class HealthController {
     private readonly databaseService: DatabaseService,
     private readonly redisService: RedisService,
     private readonly emailjsService: EmailjsService,
+    private readonly openRouterService: OpenRouterService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -108,6 +110,20 @@ export class HealthController {
           emailjs: {
             status: 'down',
             message: emailjsCheck.message || 'EmailJS service unreachable',
+          },
+        };
+      },
+
+      async () => {
+        const openRouterCheck = await this.openRouterService.ping();
+        if (openRouterCheck.status === 'up') {
+          return { openrouter: { status: 'up' } };
+        }
+        return {
+          openrouter: {
+            status: 'down',
+            message:
+              openRouterCheck.message || 'OpenRouter service unreachable',
           },
         };
       },

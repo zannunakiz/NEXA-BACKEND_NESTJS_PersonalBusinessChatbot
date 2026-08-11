@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TerminusModule } from '@nestjs/terminus';
+import { OpenrouterModule } from 'src/openrouter/openrouter.module';
 import { DatabaseModule } from '../database/database.module';
 import { EmailjsModule } from '../emailjs/emailjs.module';
 import { RedisModule } from '../redis/redis.module';
@@ -13,6 +14,7 @@ import { HealthController } from './health.controller';
     DatabaseModule,
     RedisModule,
     EmailjsModule,
+    OpenrouterModule,
   ],
   controllers: [HealthController],
 })

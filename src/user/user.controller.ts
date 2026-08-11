@@ -23,7 +23,7 @@ interface RequestWithUser extends ExpressRequest {
 @Controller('user')
 @UseGuards(JwtAuthGuard)
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Put()
   @HttpCode(HttpStatus.OK)
