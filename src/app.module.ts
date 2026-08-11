@@ -24,6 +24,8 @@ import { OpenrouterModule } from './openrouter/openrouter.module';
 import { RedisModule } from './redis/redis.module';
 import { UserModule } from './user/user.module';
 import { OrganizationModule } from './organization/organization.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
+import { CharacteristicModule } from './characteristic/characteristic.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { OrganizationModule } from './organization/organization.module';
     UserModule,
     OpenrouterModule,
     OrganizationModule,
+    ChatbotModule,
+    CharacteristicModule,
   ],
   controllers: [AppController],
   providers: [

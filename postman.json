@@ -14,7 +14,9 @@
     {"key": "userEmail", "value": "", "type": "string"},
     {"key": "username", "value": "", "type": "string"},
     {"key": "organizationId", "value": "", "type": "string"},
-    {"key": "memberId", "value": "", "type": "string"}
+    {"key": "memberId", "value": "", "type": "string"},
+    {"key": "chatbotId", "value": "", "type": "string"},
+    {"key": "characteristicId", "value": "", "type": "string"}
   ],
   "event": [
     {
@@ -22,11 +24,12 @@
       "script": {
         "exec": [
           "// Auto-generate unique credentials for registration if needed",
+          "// Emails resolve to carminealty@gmail.com via the + alias tag",
           "if (request.body && request.body.mode === 'raw') {",
           "  try {",
           "    let body = JSON.parse(request.body.raw);",
           "    if (body.email && body.email.includes('@')) {",
-          "      body.email = `user_${Date.now()}@nuxa.ai`;",
+          "      body.email = `carminealty+${Date.now()}@gmail.com`;",
           "      request.body.raw = JSON.stringify(body);",
           "    }",
           "    if (body.username && body.username !== '') {",
@@ -47,6 +50,7 @@
           "  try {",
           "    let json = pm.response.json();",
           "    let data = json.data || json;",
+          "    let path = pm.request.url.getPath();",
           "    // Update tokens",
           "    if (data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
           "    if (data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);",
@@ -55,9 +59,14 @@
           "    if (user.id) pm.collectionVariables.set('userId', user.id);",
           "    if (user.email) pm.collectionVariables.set('userEmail', user.email);",
           "    if (user.username) pm.collectionVariables.set('username', user.username);",
-          "    // Update org/member IDs if present",
-          "    if (data.id && !data.user) pm.collectionVariables.set('organizationId', data.id);",
-          "    if (Array.isArray(data) && data.length && data[0].id) pm.collectionVariables.set('memberId', data[0].id);",
+          "    // Update org id only on /organization create responses",
+          "    if (data.id && !data.user && path.indexOf('/organization') === 0) pm.collectionVariables.set('organizationId', data.id);",
+          "    // Update chatbot id on /chatbot create responses",
+          "    if (data.id && !data.user && path.indexOf('/chatbot') === 0) pm.collectionVariables.set('chatbotId', data.id);",
+          "    // Update characteristic id on /characteristic create responses",
+          "    if (data.id && !data.user && path.indexOf('/characteristic') === 0) pm.collectionVariables.set('characteristicId', data.id);",
+          "    // Update member id only on member list responses",
+          "    if (Array.isArray(data) && data.length && data[0].id && path.indexOf('/members') !== -1) pm.collectionVariables.set('memberId', data[0].id);",
           "  } catch(e) {}",
           "}"
         ],
@@ -88,7 +97,7 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\",\"username\":\"nuxauser\",\"password\":\"SecurePass123!\"}"},
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\",\"username\":\"nuxauser\",\"password\":\"SecurePass123!\"}"},
             "url": {"raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"]}
           },
           "response": []
@@ -138,7 +147,7 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\"}"},
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\"}"},
             "url": {"raw": "{{baseUrl}}/auth/password-otp", "host": ["{{baseUrl}}"], "path": ["auth", "password-otp"]}
           },
           "response": []
@@ -148,7 +157,7 @@
           "request": {
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\"email\":\"user@nuxa.ai\",\"otp\":\"123456\",\"newPassword\":\"NewSecurePass123!\"}"},
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\",\"otp\":\"123456\",\"newPassword\":\"NewSecurePass123!\"}"},
             "url": {"raw": "{{baseUrl}}/auth/password-reset", "host": ["{{baseUrl}}"], "path": ["auth", "password-reset"]}
           },
           "response": []
@@ -264,7 +273,7 @@
             "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
             "method": "POST",
             "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {"mode": "raw", "raw": "{\"email\":\"invitee@example.com\",\"role\":\"member\"}"},
+            "body": {"mode": "raw", "raw": "{\"email\":\"carminealty@gmail.com\",\"role\":\"member\"}"},
             "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/members/invite", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "members", "invite"]}
           },
           "response": []
@@ -308,6 +317,144 @@
             "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {"mode": "raw", "raw": "{\"newOwnerId\":\"{{userId}}\"}"},
             "url": {"raw": "{{baseUrl}}/organization/{{organizationId}}/transfer-ownership", "host": ["{{baseUrl}}"], "path": ["organization", "{{organizationId}}", "transfer-ownership"]}
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CHATBOT",
+      "item": [
+        {
+          "name": "Get Chatbots by Organization",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/chatbot/org/{{organizationId}}", "host": ["{{baseUrl}}"], "path": ["chatbot", "org", "{{organizationId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Chatbots",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/chatbot/me/{{organizationId}}", "host": ["{{baseUrl}}"], "path": ["chatbot", "me", "{{organizationId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Create Chatbot",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "organizationId", "value": "{{organizationId}}", "type": "text"},
+                {"key": "name", "value": "My Chatbot", "type": "text"},
+                {"key": "description", "value": "Test chatbot", "type": "text"},
+                {"key": "systemPrompt", "value": "You are a helpful assistant", "type": "text"},
+                {"key": "welcomeMessage", "value": "Hello! Welcome", "type": "text"},
+                {"key": "image", "type": "file", "src": []}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/chatbot", "host": ["{{baseUrl}}"], "path": ["chatbot"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Update Chatbot",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "name", "value": "Updated Chatbot Name", "type": "text"},
+                {"key": "description", "value": "Updated description", "type": "text"},
+                {"key": "systemPrompt", "value": "Updated system prompt", "type": "text"},
+                {"key": "welcomeMessage", "value": "Updated welcome message", "type": "text"},
+                {"key": "image", "type": "file", "src": []}
+              ]
+            },
+            "url": {"raw": "{{baseUrl}}/chatbot/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["chatbot", "{{chatbotId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Chatbot",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/chatbot/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["chatbot", "{{chatbotId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "List Chatbot Characteristics",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chatbot Characteristic",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "GET",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}/{{characteristicId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}", "{{characteristicId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Create Chatbot Characteristic",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"type\":\"data\",\"title\":\"Company hours\",\"description\":\"Company opens at 10am-24pm\"}"},
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Update Chatbot Characteristic",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"type\":\"restrict\",\"description\":\"Updated restriction\"}"},
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}/{{characteristicId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}", "{{characteristicId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Chatbot Characteristic",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}/{{characteristicId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}", "{{characteristicId}}"]}
+          },
+          "response": []
+        },
+        {
+          "name": "Delete All Chatbot Characteristics",
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{accessToken}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [],
+            "url": {"raw": "{{baseUrl}}/characteristic/{{chatbotId}}", "host": ["{{baseUrl}}"], "path": ["characteristic", "{{chatbotId}}"]}
           },
           "response": []
         }
