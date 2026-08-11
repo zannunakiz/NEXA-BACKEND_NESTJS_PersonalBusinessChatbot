@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Client } from 'pg';
-import 'dotenv/config';
 
 function formatConnectionString(url: string): string {
   if (url.includes('sslmode=')) {
@@ -47,10 +47,9 @@ async function runAllMigrations() {
   const rawSql = readFileSync(sqlPath, 'utf8');
   const sqlContent = rawSql.replace(/\u00a0/g, ' ');
 
-  console.log('🚀 Starting schema migration across all 3 NeonDB nodes...\n');
+  console.log('🚀 Starting schema migration across all database nodes...\n');
 
   await migrateNode('MAIN DB', process.env.NEONDB_MAIN_URL, sqlContent);
-  await migrateNode('DUPLICATE DB', process.env.NEONDB_DUPLICATE_URL, sqlContent);
   await migrateNode('BACKUP DB', process.env.NEONDB_BACKUP_URL, sqlContent);
 
   console.log('\n🎉 Migration process completed.');
