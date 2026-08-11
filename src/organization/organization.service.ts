@@ -141,7 +141,7 @@ export class OrganizationService {
     description?: string,
   ): Promise<OrganizationRow> {
     this.logger.log(
-      `🔍 updateOrganization called: org=${organizationId}, user=${userId}`,
+      `updateOrganization called: org=${organizationId}, user=${userId}`,
     );
 
     const orgRow = await this.databaseService.executeReadMain<{
@@ -156,10 +156,11 @@ export class OrganizationService {
     }
 
     const ownerId = orgRow[0].owner_id;
-    this.logger.log(`📌 Owner ID: ${ownerId}, Requesting User: ${userId}`);
 
     if (ownerId !== userId) {
-      this.logger.warn(`⛔ User ${userId} is NOT the owner – rejecting update`);
+      this.logger.warn(
+        `User ${userId} is not the owner of org ${organizationId}`,
+      );
       throw new ForbiddenException(
         'Only the owner can update the organization',
       );
@@ -174,14 +175,16 @@ export class OrganizationService {
 
     if (memberRows.length === 0 || memberRows[0].role !== MemberRole.OWNER) {
       this.logger.warn(
-        `⛔ User ${userId} is not marked as owner in members table`,
+        `User ${userId} is not marked as owner in the members table for org ${organizationId}`,
       );
       throw new ForbiddenException(
         'Only the owner can update the organization',
       );
     }
 
-    this.logger.log(`✅ User ${userId} is owner, proceeding with update`);
+    this.logger.log(
+      `User ${userId} confirmed as owner, proceeding with update`,
+    );
 
     if (name !== undefined) {
       const duplicate =
@@ -231,7 +234,7 @@ export class OrganizationService {
     }
 
     this.logger.log(
-      `🔍 updateOrganizationBanner called: org=${organizationId}, user=${userId}`,
+      `updateOrganizationBanner called: org=${organizationId}, user=${userId}`,
     );
 
     const orgRow = await this.databaseService.executeReadMain<{
@@ -249,7 +252,9 @@ export class OrganizationService {
     const ownerId = orgRow[0].owner_id;
 
     if (ownerId !== userId) {
-      this.logger.warn(`⛔ User ${userId} is NOT the owner – rejecting update`);
+      this.logger.warn(
+        `User ${userId} is not the owner of org ${organizationId}`,
+      );
       throw new ForbiddenException(
         'Only the owner can update the organization banner',
       );
@@ -264,7 +269,7 @@ export class OrganizationService {
 
     if (memberRows.length === 0 || memberRows[0].role !== MemberRole.OWNER) {
       this.logger.warn(
-        `⛔ User ${userId} is not marked as owner in members table`,
+        `User ${userId} is not marked as owner in the members table for org ${organizationId}`,
       );
       throw new ForbiddenException(
         'Only the owner can update the organization banner',
@@ -337,7 +342,7 @@ export class OrganizationService {
     if (imageUrl) {
       try {
         await this.cloudinaryService.deleteImage(imageUrl);
-        this.logger.log(`✅ Deleted Cloudinary image: ${imageUrl}`);
+        this.logger.log(`Deleted Cloudinary image for org ${organizationId}`);
       } catch (error) {
         this.logger.warn(
           `Failed to delete Cloudinary image: ${error instanceof Error ? error.message : String(error)}`,
@@ -351,7 +356,6 @@ export class OrganizationService {
     );
   }
 
-  // ---------- INVITE MEMBER (OWNER OR ADMIN) ----------
   async inviteMember(
     organizationId: string,
     inviterId: string,
@@ -372,6 +376,18 @@ export class OrganizationService {
       throw new ForbiddenException('Only owners and admins can invite members');
     }
 
+    if (role === MemberRole.OWNER) {
+      throw new BadRequestException(
+        'Use transfer ownership endpoint to make someone owner',
+      );
+    }
+
+    if (inviterRole === MemberRole.ADMIN && role === MemberRole.ADMIN) {
+      throw new ForbiddenException(
+        'Admins can only invite members with the member role',
+      );
+    }
+
     const userRows = await this.databaseService.executeReadMain<UserRow>(
       'SELECT id, email FROM users WHERE email = $1',
       [email],
@@ -385,9 +401,15 @@ export class OrganizationService {
       throw new BadRequestException('You cannot invite yourself');
     }
 
-    if (role === MemberRole.OWNER) {
+    const orgRow = await this.databaseService.executeReadMain<{
+      owner_id: string;
+    }>('SELECT owner_id FROM organizations WHERE id = $1', [organizationId]);
+    if (orgRow.length === 0) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (orgRow[0].owner_id === targetUserId) {
       throw new BadRequestException(
-        'Use transfer ownership endpoint to make someone owner',
+        'Cannot modify the owner membership through invite',
       );
     }
 

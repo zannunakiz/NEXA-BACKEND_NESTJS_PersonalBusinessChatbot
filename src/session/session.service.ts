@@ -140,7 +140,7 @@ export class SessionService {
 
   async getChatsForSession(sessionId: string): Promise<ChatRow[]> {
     return this.databaseService.executeReadMain<ChatRow>(
-      'SELECT id, session_id, chatbot_id, ai_chat, customer_chat, created_at FROM chats WHERE session_id = $1 ORDER BY created_at DESC',
+      'SELECT id, session_id, chatbot_id, ai_chat, customer_chat, created_at FROM chats WHERE session_id = $1 ORDER BY created_at ASC',
       [sessionId],
     );
   }

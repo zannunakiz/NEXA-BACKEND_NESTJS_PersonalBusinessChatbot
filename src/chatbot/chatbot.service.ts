@@ -208,13 +208,17 @@ export class ChatbotService {
   private async assertMembership(
     organizationId: string,
     userId: string,
-  ): Promise<void> {
-    const rows = await this.databaseService.executeReadMain<{ id: string }>(
-      'SELECT id FROM members WHERE organization_id = $1 AND user_id = $2',
+  ): Promise<string> {
+    const rows = await this.databaseService.executeReadMain<{
+      id: string;
+      role: string;
+    }>(
+      'SELECT id, role FROM members WHERE organization_id = $1 AND user_id = $2',
       [organizationId, userId],
     );
     if (rows.length === 0) {
       throw new ForbiddenException('You are not a member of this organization');
     }
+    return rows[0].role;
   }
 }
