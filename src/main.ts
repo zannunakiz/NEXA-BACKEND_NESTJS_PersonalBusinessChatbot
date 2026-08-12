@@ -1,5 +1,6 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import 'dotenv/config';
 import { NextFunction, Request, Response } from 'express';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -8,8 +9,8 @@ import cluster from 'node:cluster';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RedisCacheInterceptor } from './common/interceptors/redis-cache.interceptor';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RedisService } from './redis/redis.service';
 
 cluster.schedulingPolicy = cluster.SCHED_RR;
@@ -21,8 +22,13 @@ async function bootstrap() {
 
     logger.log(`🚀 Master Process running on PID: ${process.pid}`);
     logger.log(`Forking ${WORKER_COUNT} Worker...`);
+    console.log('');
+    console.log('');
     console.log('Server is running on http://localhost:3000');
     console.log('Health at http://localhost:3000/health');
+    console.log('Swagger UI: http://localhost:3000/api');
+    console.log('OpenAPI JSON: http://localhost:3000/api-json');
+    console.log('');
 
     for (let i = 0; i < WORKER_COUNT; i++) {
       cluster.fork();
@@ -55,6 +61,27 @@ async function bootstrap() {
       new RedisCacheInterceptor(redisService),
     );
     app.useGlobalFilters(new AllExceptionsFilter());
+
+    // Swagger / OpenAPI Documentation
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('NEXA API')
+      .setDescription(
+        'NEXA chatbot API - comprehensive REST documentation for all modules.',
+      )
+      .setVersion('1.0.0')
+      .addTag('Auth', 'Authentication and account management')
+      .addTag('User', 'User profile management')
+      .addTag('Organization', 'Organizations and members')
+      .addTag('Chatbot', 'Chatbot management')
+      .addTag('Characteristic', 'Chatbot characteristics')
+      .addTag('Session', 'Customer chat sessions')
+      .addTag('Chat', 'Customer chat messages')
+      .addTag('Health', 'System health')
+      .addTag('Master', 'Administrative operations')
+      .addBearerAuth()
+      .build();
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, swaggerDocument);
 
     const httpLogger = new Logger('HTTP');
     const clsService = app.get(ClsService);

@@ -1,6 +1,7 @@
 // src/health/health.controller.ts
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckResult,
@@ -18,6 +19,7 @@ interface CloudinaryPingResponse {
   status: string;
 }
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -32,6 +34,7 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({ summary: 'Check system health' })
   async check(): Promise<HealthCheckResult & { worker: string }> {
     const healthResult = await this.health.check([
       async () => {

@@ -14,6 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import 'multer';
 import { JwtAuthGuard, JwtUser } from '../auth/jwt-auth.guard';
@@ -35,12 +36,15 @@ interface RequestWithUser extends ExpressRequest {
   user: JwtUser;
 }
 
+@ApiTags('Organization')
 @Controller('organization')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create an organization (owner)' })
   async create(
     @Req() req: RequestWithUser,
     @Body() dto: CreateOrganizationDto,
@@ -54,6 +58,7 @@ export class OrganizationController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List organizations the user belongs to' })
   async list(@Req() req: RequestWithUser): Promise<{
     message: string;
     data: (OrganizationRow & { role: MemberRole })[];
@@ -65,6 +70,7 @@ export class OrganizationController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get organization details' })
   async get(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -77,6 +83,7 @@ export class OrganizationController {
   }
 
   @Get(':id/members')
+  @ApiOperation({ summary: 'List organization members' })
   async listMembers(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -90,6 +97,7 @@ export class OrganizationController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update organization (owner)' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -106,6 +114,7 @@ export class OrganizationController {
 
   @Put(':id/banner')
   @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({ summary: 'Update organization banner image (owner)' })
   async updateBanner(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -120,6 +129,7 @@ export class OrganizationController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete organization (owner)' })
   async delete(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -129,6 +139,7 @@ export class OrganizationController {
   }
 
   @Post(':id/members/invite')
+  @ApiOperation({ summary: 'Invite a member (owner/admin)' })
   async invite(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -144,6 +155,7 @@ export class OrganizationController {
   }
 
   @Put(':id/members/:memberId/role')
+  @ApiOperation({ summary: 'Update a member role (owner)' })
   async updateRole(
     @Param('id', ParseUUIDPipe) orgId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
@@ -160,6 +172,7 @@ export class OrganizationController {
   }
 
   @Delete(':id/members/:memberId')
+  @ApiOperation({ summary: 'Remove a member (owner/admin)' })
   async removeMember(
     @Param('id', ParseUUIDPipe) orgId: string,
     @Param('memberId', ParseUUIDPipe) memberId: string,
@@ -174,6 +187,7 @@ export class OrganizationController {
   }
 
   @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave the organization' })
   async leave(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,
@@ -183,6 +197,7 @@ export class OrganizationController {
   }
 
   @Post(':id/transfer-ownership')
+  @ApiOperation({ summary: 'Transfer organization ownership (owner)' })
   async transferOwnership(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: RequestWithUser,

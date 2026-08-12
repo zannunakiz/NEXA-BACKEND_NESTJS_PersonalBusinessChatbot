@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import { JwtAuthGuard, JwtUser } from '../auth/jwt-auth.guard';
 import {
@@ -25,12 +26,15 @@ interface RequestWithUser extends ExpressRequest {
   user: JwtUser;
 }
 
+@ApiTags('Characteristic')
 @Controller('characteristic')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class CharacteristicController {
   constructor(private readonly characteristicService: CharacteristicService) {}
 
   @Get(':chatbotId')
+  @ApiOperation({ summary: 'List characteristics of a chatbot' })
   async list(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Req() req: RequestWithUser,
@@ -47,6 +51,7 @@ export class CharacteristicController {
   }
 
   @Get(':chatbotId/:characteristicId')
+  @ApiOperation({ summary: 'Get a single characteristic' })
   async get(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('characteristicId', ParseUUIDPipe) characteristicId: string,
@@ -64,6 +69,7 @@ export class CharacteristicController {
   }
 
   @Post(':chatbotId')
+  @ApiOperation({ summary: 'Create a characteristic for a chatbot' })
   async create(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Req() req: RequestWithUser,
@@ -82,6 +88,7 @@ export class CharacteristicController {
   }
 
   @Put(':chatbotId/:characteristicId')
+  @ApiOperation({ summary: 'Update a characteristic' })
   async update(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('characteristicId', ParseUUIDPipe) characteristicId: string,
@@ -102,6 +109,7 @@ export class CharacteristicController {
   }
 
   @Delete(':chatbotId/:characteristicId')
+  @ApiOperation({ summary: 'Delete a single characteristic' })
   async deleteOne(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('characteristicId', ParseUUIDPipe) characteristicId: string,
@@ -116,6 +124,7 @@ export class CharacteristicController {
   }
 
   @Delete(':chatbotId')
+  @ApiOperation({ summary: 'Delete all characteristics of a chatbot' })
   async deleteAll(
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Req() req: RequestWithUser,
