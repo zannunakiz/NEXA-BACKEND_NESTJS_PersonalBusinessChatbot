@@ -16,6 +16,7 @@ interface CustomResponsePayload {
   message?: string;
   data?: unknown;
   pagination?: PaginationMeta;
+  redisHit?: boolean;
 }
 
 function isCustomResponsePayload(obj: unknown): obj is CustomResponsePayload {
@@ -24,6 +25,10 @@ function isCustomResponsePayload(obj: unknown): obj is CustomResponsePayload {
     obj !== null &&
     ('data' in obj || 'message' in obj || 'pagination' in obj)
   );
+}
+
+function hasRedisHit(res: unknown): res is { redisHit: boolean } {
+  return typeof res === 'object' && res !== null && 'redisHit' in res;
 }
 
 @Injectable()
@@ -61,12 +66,15 @@ export class TransformInterceptor<T> implements NestInterceptor<
           }
         }
 
+        const redisHit = hasRedisHit(res) ? res.redisHit : undefined;
+
         return {
           success: true,
           statusCode: response.statusCode,
           message,
           data,
           ...(pagination ? { pagination } : {}),
+          ...(redisHit !== undefined ? { redisHit } : {}),
           meta: {
             timestamp: new Date().toISOString(),
             path: request.url,

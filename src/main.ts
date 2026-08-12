@@ -9,6 +9,8 @@ import cluster from 'node:cluster';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { RedisCacheInterceptor } from './common/interceptors/redis-cache.interceptor';
+import { RedisService } from './redis/redis.service';
 
 cluster.schedulingPolicy = cluster.SCHED_RR;
 const WORKER_COUNT = 5;
@@ -47,7 +49,11 @@ async function bootstrap() {
     );
 
     // Global Response Interceptor & Exception Filter
-    app.useGlobalInterceptors(new TransformInterceptor());
+    const redisService = app.get(RedisService);
+    app.useGlobalInterceptors(
+      new TransformInterceptor(),
+      new RedisCacheInterceptor(redisService),
+    );
     app.useGlobalFilters(new AllExceptionsFilter());
 
     const httpLogger = new Logger('HTTP');
