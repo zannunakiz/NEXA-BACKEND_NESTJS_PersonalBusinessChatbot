@@ -6,6 +6,7 @@ import { NextFunction, Request, Response } from 'express';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ClsService } from 'nestjs-cls';
 import cluster from 'node:cluster';
+import { Server } from 'node:http';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -40,6 +41,16 @@ async function bootstrap() {
       );
       cluster.fork();
     });
+
+    const shutdownMaster = () => {
+      logger.log('🛑 Master received shutdown signal, stopping workers...');
+      for (const id of Object.keys(cluster.workers ?? {})) {
+        cluster.workers?.[id]?.kill('SIGTERM');
+      }
+      setTimeout(() => process.exit(0), 2000).unref();
+    };
+    process.on('SIGTERM', shutdownMaster);
+    process.on('SIGINT', shutdownMaster);
   } else {
     const app = await NestFactory.create(AppModule);
 
@@ -120,6 +131,50 @@ async function bootstrap() {
     workerLogger.log(
       `⚙️ Worker Process listening on port ${port} | PID: ${process.pid}`,
     );
+
+    const shutdownLogger = new Logger('Shutdown');
+    const server = app.getHttpServer() as unknown as Server;
+    let isShuttingDown = false;
+
+    const gracefulShutdown = async (signal: string): Promise<void> => {
+      if (isShuttingDown) {
+        return;
+      }
+      isShuttingDown = true;
+      shutdownLogger.log(`🛑 Received ${signal}, shutting down gracefully`);
+
+      const forceTimer = setTimeout(() => {
+        shutdownLogger.error('Forced exit after shutdown timeout');
+        process.exit(1);
+      }, 10000);
+      forceTimer.unref();
+
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        const closeable = server as unknown as {
+          closeAllConnections?: () => void;
+          closeIdleConnections?: () => void;
+        };
+        closeable.closeAllConnections?.();
+        closeable.closeIdleConnections?.();
+      });
+
+      try {
+        await app.close();
+        shutdownLogger.log('✅ Graceful shutdown completed');
+        process.exit(0);
+      } catch (error) {
+        shutdownLogger.error(
+          `Failed during shutdown: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
   }
 }
 

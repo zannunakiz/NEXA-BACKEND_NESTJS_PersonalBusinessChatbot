@@ -16,6 +16,9 @@ import {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  private readonly notFoundMessage =
+    'Whoa, looks like that path does not exist in my world. 🕵️‍♂️ Head back to /api to see what I can do. 👋';
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -61,6 +64,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `Unhandled exception: ${exception.message}`,
         exception.stack,
       );
+    }
+
+    if (
+      status === HttpStatus.NOT_FOUND &&
+      typeof message === 'string' &&
+      message.startsWith('Cannot ')
+    ) {
+      message = this.notFoundMessage;
+      errorCode = 'NOT_FOUND';
     }
 
     const errorResponse: ApiErrorResponse = {
