@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'nexa-api',
-      script: './dist/src/main.js',
+      script: './dist/main.js',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,

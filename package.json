@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main",
+    "start:prod": "node dist/main",
     "start:pm2": "pm2 start ecosystem.config.js",
     "restart:pm2": "pm2 restart ecosystem.config.js",
     "stop:pm2": "pm2 stop ecosystem.config.js",
