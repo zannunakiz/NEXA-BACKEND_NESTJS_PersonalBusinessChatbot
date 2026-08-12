@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./NexaLogo.png" width="180" alt="NEXA" />
+  <img src="./public/NexaLogo.png" width="180" alt="NEXA" />
 </p>
 
 <h1 align="center">NEXA — AI Chatbot API</h1>
@@ -95,7 +95,7 @@ Use it to power customer-support bots, FAQ assistants, or sales agents for **any
 ## System Design
 
 <p align="center">
-  <img src="./SystemDesign.png" alt="NEXA System Design" width="750" />
+  <img src="./public/SystemDesign.png" alt="NEXA System Design" width="750" />
 </p>
 
 **Flow** — A user → JWT → organization → members create chatbots → characteristics are attached → a customer calls `POST /session/:chatbotId` to create/resume a session → `POST /chat/:sessionId` sends the message → the API assembles the AI prompt (bot + characteristics + history) → OpenRouter replies → the paired chat is persisted in Redis-cached PostgreSQL.
@@ -113,6 +113,10 @@ Use it to power customer-support bots, FAQ assistants, or sales agents for **any
 ## Security
 
 **NEXA protects every layer** — from the network edge to the database.
+
+<p align="center">
+  <img src="./public/Arcjet.png" alt="Arcjet Security" width="600" />
+</p>
 
 - **Arcjet** — a global guard that shields the API with:
   - **Shield** — catches suspicious / malicious request patterns.
@@ -137,6 +141,10 @@ ARCJET_MODE=DRY_RUN   # or LIVE in production
 ## OpenRouter AI
 
 **OpenRouter** powers the chatbot intelligence with a free chat-completions model — no heavy ML setup needed.
+
+<p align="center">
+  <img src="./public/Openrouter.png" alt="OpenRouter AI" width="600" />
+</p>
 
 - On every `POST /chat/:sessionId`, the API:
   1. Loads the chatbot's `system_prompt` and its **characteristics** (`data` + `restrict`),
@@ -163,6 +171,10 @@ const OPENROUTER_MODEL = 'openrouter/free';
 
 **NeonDB** is the cloud-hosted PostgreSQL backbone — serverless, auto-scaling, and fully managed.
 
+<p align="center">
+  <img src="./public/NeonDbArchitecture.png" alt="NeonDB Architecture" width="600" />
+</p>
+
 - NEXA keeps **three Neon databases**: `main`, `duplicate` (replica), and `backup`.
 - **Dual-write** sends every write to `main` + `duplicate`; reads prefer the `duplicate`, and the **backup** is refreshed by the scheduled sync cron.
 - The `pg` client connects per operation with SSL, so it works cleanly in local, Docker, and serverless environments.
@@ -179,6 +191,10 @@ NEONDB_BACKUP_URL=postgresql://...@ap-southeast-1.aws.neon.tech/backup?sslmode=r
 ## Cloudinary
 
 **Cloudinary** handles all image uploads and delivery (user avatars, organization banners, and chatbot images).
+
+<p align="center">
+  <img src="./public/Cloudinary.png" alt="Cloudinary" width="600" />
+</p>
 
 - Images are uploaded and their **`secure_url`** is stored in the database.
 - When an image is replaced or its record deleted, the old asset is removed from Cloudinary too.
